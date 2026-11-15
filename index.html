@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#170a13">
+<title>너에게 주는 크리스마스 트리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Great+Vibes&family=JetBrains+Mono:wght@500;700&family=Nanum+Gothic+Coding:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12070f; --card: rgba(255, 236, 242, .06); --line: rgba(255, 200, 215, .2);
+    --cream: #fdeef0; --blush: #f7b9c6; --rose: #f08aa4; --gold: #ffd9a0; --mauve: #b08da0;
+    --serif: "Gowun Batang", "Apple SD Gothic Neo", "Malgun Gothic", serif;
+    --script: "Great Vibes", "Snell Roundhand", cursive;
+    --bar: 54px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--cream); font-family: var(--serif); overflow: hidden; }
+  #stage { position: fixed; inset: 0 0 calc(var(--bar) + env(safe-area-inset-bottom)) 0; display: grid; place-items: center; }
+  canvas { display: block; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  /* 시작 화면 */
+  #intro {
+    position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; text-align: center; padding: 28px;
+    background: radial-gradient(ellipse at 50% 40%, rgba(74, 26, 50, .55), rgba(18, 7, 15, .96) 70%);
+    transition: opacity .8s ease, visibility .8s;
+  }
+  #intro.hide { opacity: 0; visibility: hidden; }
+  #intro .script { font-family: var(--script); font-size: clamp(38px, 7vw, 64px); color: var(--gold); line-height: 1; text-shadow: 0 0 30px rgba(255, 190, 120, .45); }
+  #intro h1 { margin: 22px 0 12px; font-size: clamp(21px, 3.6vw, 34px); font-weight: 700; line-height: 1.5; text-wrap: balance; word-break: keep-all; }
+  #intro p { margin: 0 0 36px; color: var(--mauve); font-size: clamp(13px, 1.6vw, 16px); }
+  #open {
+    font: 700 18px var(--serif); color: #4a1528; border: 0; border-radius: 999px; padding: 17px 44px; cursor: pointer;
+    background: linear-gradient(180deg, #ffe3e9, #f6b3c3); box-shadow: 0 10px 40px rgba(240, 138, 164, .35), inset 0 1px 0 rgba(255,255,255,.7);
+    transition: transform .2s, box-shadow .2s; animation: breathe 2.6s ease-in-out infinite;
+  }
+  #open:hover, #open:focus-visible { transform: translateY(-2px) scale(1.03); box-shadow: 0 14px 50px rgba(240, 138, 164, .55), inset 0 1px 0 rgba(255,255,255,.7); outline: none; }
+  @keyframes breathe { 50% { box-shadow: 0 10px 60px rgba(240, 138, 164, .6), inset 0 1px 0 rgba(255,255,255,.7); } }
+  #self { display: block; margin: 20px auto 0; font: 400 14px var(--serif); color: var(--mauve); background: none; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; padding: 8px; }
+  #self:hover, #self:focus-visible { color: var(--blush); outline: none; }
+
+  /* 아래 조작 막대 */
+  #bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; height: calc(var(--bar) + env(safe-area-inset-bottom)); padding: 0 14px env(safe-area-inset-bottom);
+    display: flex; align-items: center; gap: 8px; background: rgba(18, 7, 15, .9); border-top: 1px solid rgba(255, 200, 215, .1); font-size: 13px;
+  }
+  #bar button {
+    font: 400 13px var(--serif); color: var(--blush); background: transparent; border: 1px solid var(--line);
+    border-radius: 999px; height: 34px; padding: 0 14px; cursor: pointer; white-space: nowrap; transition: .15s;
+  }
+  #bar button:hover { border-color: var(--rose); color: #fff; }
+  #bar button:focus-visible { outline: 2px solid var(--rose); outline-offset: 2px; }
+  #bar button:disabled { opacity: .35; cursor: default; }
+  #play { width: 38px; padding: 0 !important; font-size: 12px !important; }
+  #seek { flex: 1; min-width: 40px; accent-color: var(--rose); height: 4px; cursor: pointer; }
+  #seek:disabled { cursor: default; opacity: .6; }
+  #status { color: var(--mauve); min-width: 84px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (max-width: 640px) {
+    #bar { gap: 6px; padding-left: 8px; padding-right: 8px; }
+    #bar button { padding: 0 10px; font-size: 12px; }
+    #status { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c" aria-label="코드가 타이핑되면서 그 글자들이 회전하는 크리스마스 트리가 되는 애니메이션"></canvas></div>
+
+<div id="intro">
+  <div>
+    <div class="script">for you</div>
+    <h1 id="introTitle">작은 크리스마스 선물이 도착했어요</h1>
+    <p>소리를 켜고 열어 보면 더 좋아요 ♪</p>
+    <button id="open">선물 열어보기</button>
+    <button id="self">직접 타이핑해서 트리 키우기</button>
+  </div>
+</div>
+
+<div id="bar">
+  <button id="play" title="재생/일시정지" disabled>▶</button>
+  <button id="restart" title="처음부터" disabled>처음부터</button>
+  <input id="seek" type="range" min="0" max="1000" value="0" step="1" disabled aria-label="재생 위치">
+  <span id="status"></span>
+  <button id="mode" disabled>직접 치기</button>
+  <button id="sound" title="소리 켬/끔">소리 켬</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ════════════════════════════════════════════════════════════════
+  // 0. 선물 내용: 여기만 고치면 됩니다
+  // ════════════════════════════════════════════════════════════════
+  const GIFT = {
+    to: '',                 // 받는 사람 이름 (예: '지은'). 비워 두면 이름 없이 나옵니다
+    from: '범수',           // 보내는 사람
+    message: [              // 마지막에 나오는 편지. 빈 줄('')은 문단 간격
+      '코드 한 줄 한 줄이 모여 트리가 된 것처럼',
+      '너와 보낸 하루하루가 모여',
+      '나의 가장 따뜻한 겨울이 됐어.',
+      '',
+      '올해도 내 곁에 있어 줘서 고마워.',
+    ],
+  };
+  // 주소 뒤에 ?to=이름&from=이름 을 붙여도 바뀝니다
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('to')) GIFT.to = qs.get('to').slice(0, 12);
+  if (qs.get('from')) GIFT.from = qs.get('from').slice(0, 12);
+
+  // ════════════════════════════════════════════════════════════════
+  // 1. 시각표: 무엇이 언제 일어나는가
+  // ════════════════════════════════════════════════════════════════
+  const CODE = `# christmas.py · ${GIFT.to || '너'}에게
+
+you = "세상에서 제일 예쁜 사람"
+me = "그런 너를 좋아하는 사람"
+
+def our_year():
+    love = 0
+    for day in range(365):
+        love += 1      # 매일 조금씩 더
+    return love
+
+tree = grow(our_year())
+tree.decorate(with_="우리의 추억")
+tree.light_up()
+
+print("메리 크리스마스,", you)`;
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const isWide = (ch) => ch.charCodeAt(0) >= 0x1100;   // 한글은 두 칸
+
+  // 자동 재생용 타이핑 시각: 간격에 편차를 두고 줄바꿈과 새 문단 앞에서 쉰다
+  const rng = mulberry32(1225);
+  const START = 1.4;
+  const chars = [];
+  let LINE_COUNT, AUTO_TYPE_END;
+  (function buildTyping() {
+    let t = START, line = 0, col = 0, lineStart = true, ns = 0, enterT = START;
+    for (let i = 0; i < CODE.length; i++) {
+      const ch = CODE[i];
+      if (ch === '\n') {
+        chars.push({ i, ch, line, col, w: 1, autoT: t, key: 'enter', ns: -1 });
+        enterT = t;
+        let pause = 0.16 + rng() * 0.12;
+        if (CODE[i + 1] === '\n') pause = 0.1 + rng() * 0.05;
+        else if (col === 0) pause = 0.4 + rng() * 0.3;
+        t += pause; line++; col = 0; lineStart = true;
+        continue;
+      }
+      if (ch === ' ' && lineStart) {            // 자동 들여쓰기: 키 입력이 아니다
+        chars.push({ i, ch, line, col, w: 1, autoT: enterT, key: null, ns: -1 });
+        col++;
+        continue;
+      }
+      lineStart = false;
+      const w = isWide(ch) ? 2 : 1;
+      chars.push({ i, ch, line, col, w, autoT: t, key: ch === ' ' ? 'space' : 'key', ns: ch === ' ' ? -1 : ns++ });
+      col += w;
+      let d = 0.042 + rng() * 0.044;
+      if (w === 2) d *= 1.7;                     // 한글 한 글자는 여러 타
+      if (',:)'.includes(ch)) d += 0.03;
+      if (rng() < 0.06) d += 0.12 + rng() * 0.2;
+      t += d;
+    }
+    LINE_COUNT = line + 1;
+    AUTO_TYPE_END = t;
+  })();
+  const KEY_TOTAL = chars.filter((c) => c.key).length;
+  const nsChars = chars.filter((c) => c.ns >= 0);
+
+  const CMD = 'python christmas.py';
+  const cmdOffsets = [];
+  let cmdLen = 0;
+  for (let i = 0; i < CMD.length; i++) { cmdOffsets.push(cmdLen); cmdLen += 0.05 + rng() * 0.04; }
+
+  // 고요한 밤 (1818년 곡, 퍼블릭 도메인): 앞 8마디 + 마지막 4마디
+  const WAVE = 1.5, BEAT = 0.56;
+  const F = {
+    B3: 246.94, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0,
+    C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.0, B5: 987.77, C6: 1046.5, D6: 1174.66, E6: 1318.51, G6: 1567.98, C7: 2093.0,
+  };
+  const notes = [];
+  let TOTAL_BEATS = 0;
+  [['G5', 1.5], ['A5', 0.5], ['G5', 1], ['E5', 3], ['G5', 1.5], ['A5', 0.5], ['G5', 1], ['E5', 3],
+   ['D6', 2], ['D6', 1], ['B5', 3], ['C6', 2], ['C6', 1], ['G5', 3],
+   ['C6', 1.5], ['G5', 0.5], ['E5', 1], ['G5', 1.5], ['F5', 0.5], ['D5', 1], ['C5', 6]].forEach(([name, len]) => {
+    notes.push({ t: Infinity, freq: F[name], beats: len, beat: TOTAL_BEATS });
+    TOTAL_BEATS += len;
+  });
+  const CHORDS = [
+    [F.C4, F.E4, F.G4], [F.C4, F.E4, F.G4], [F.C4, F.E4, F.G4], [F.C4, F.E4, F.G4],
+    [F.B3, F.D4, F.G4], [F.B3, F.D4, F.G4], [F.C4, F.E4, F.G4], [F.C4, F.E4, F.G4],
+    [F.C4, F.E4, F.G4], [F.B3, F.F4, F.G4], [F.C4, F.E4, F.G4], null,
+  ];
+
+  // ── 3D 트리: 글자를 원뿔 표면에 황금각으로 고르게 뿌린다 ─────────
+  // 각 칸은 (높이 hf: 0 밑동~1 꼭대기, 반지름 rf, 각도 th)만 기억한다
+  const tierRadius = (hf) => {
+    const u = 1 - hf;                             // 꼭대기에서 잰 거리
+    const s = (u * 4 - 1e-4) % 1;                 // 네 층의 톱니 실루엣
+    return u * (0.78 + 0.22 * s);
+  };
+  const crng = mulberry32(777);
+  const cells = [];
+  const TRUNK_N = 18;
+  for (let k = 0; k < TRUNK_N; k++) {             // 기둥: 작은 원통
+    cells.push({ kind: 'trunk', hf: -0.035 - Math.floor(k / 6) * 0.038, rf: 0.085, th: (k % 6) * 1.0472 + Math.floor(k / 6) * 0.5 });
+  }
+  const LEAF_N = nsChars.length * 2 - TRUNK_N;    // 친 글자 하나가 트리 두 칸이 된다
+  for (let i = LEAF_N - 1; i >= 0; i--) {         // 밑동부터 위로 채운다
+    const hf = 1 - Math.sqrt((i + 0.5) / LEAF_N);
+    cells.push({ kind: 'leaf', hf, rf: tierRadius(hf) * (0.93 + crng() * 0.07), th: i * 2.399963 });
+  }
+  cells.forEach((c, j) => {
+    c.src = nsChars[Math.min(nsChars.length - 1, Math.floor((j * nsChars.length) / cells.length))];
+    c.ch = c.src.ch;
+    c.r1 = crng(); c.r2 = crng(); c.r3 = crng(); c.r4 = crng();
+    c.dur = 0.85 + c.r1 * 0.4;                    // 날아가는 시간
+    c.litOff = WAVE * Math.max(0, c.hf);          // 빛이 밑에서 위로 올라오는 순서
+    c.heart = false;
+  });
+  // 점등하면 하트로 바뀌는 칸들
+  const leafCells = cells.filter((c) => c.kind === 'leaf' && c.hf > 0.06 && c.hf < 0.9);
+  for (let k = 0; k < 18; k++) leafCells[Math.floor(((k + crng()) / 18) * leafCells.length)].heart = true;
+
+  // 나선으로 감기는 전구 줄
+  const GARLAND_N = 84;
+  const garland = Array.from({ length: GARLAND_N }, (_, i) => {
+    const hf = 0.02 + (i / GARLAND_N) * 0.93;
+    return { kind: 'light', k: i, hf, rf: tierRadius(hf) * 1.07 + 0.01, th: (i / GARLAND_N) * Math.PI * 2 * 6.5, litOff: WAVE * hf, color: i % 3, ph: crng() * 6.28, w: 2 + crng() * 3 };
+  });
+
+  // 실행 중에 바뀌는 시각들. 아직 일어나지 않은 일은 Infinity
+  const S = { cmdTimes: [] };
+  let events = [], evPtr = 0;
+
+  function clearSchedule() {
+    Object.assign(S, { TYPE_END: Infinity, CMD_START: Infinity, CMD_ENTER: Infinity, RUN: Infinity, STAR_T: Infinity, MUSIC_START: Infinity, MUSIC_END: Infinity });
+    S.cmdTimes = CMD.split('').map(() => Infinity);
+    notes.forEach((n) => (n.t = Infinity));
+    events = []; evPtr = 0;
+  }
+
+  // 타이핑이 끝난 시각이 정해지면 그 뒤의 모든 일정이 따라 정해진다
+  function scheduleFinale(typeEnd) {
+    S.TYPE_END = typeEnd;
+    S.CMD_START = typeEnd + 0.9;
+    S.cmdTimes = cmdOffsets.map((o) => S.CMD_START + o);
+    S.CMD_ENTER = S.CMD_START + cmdLen + 0.35;
+    S.RUN = S.CMD_ENTER + 0.15;
+    S.STAR_T = S.RUN + WAVE + 0.1;
+    S.MUSIC_START = S.RUN + WAVE + 0.9;
+    S.MUSIC_END = S.MUSIC_START + TOTAL_BEATS * BEAT;
+    notes.forEach((n) => (n.t = S.MUSIC_START + n.beat * BEAT));
+
+    S.cmdTimes.forEach((t, i) => events.push({ t, play: (w) => sfx.click(w, CMD[i] === ' ' ? 'space' : 'key') }));
+    events.push({ t: S.CMD_ENTER, play: (w) => sfx.click(w, 'enter') });
+    events.push({ t: S.RUN - 0.05, play: (w) => sfx.whoosh(w, WAVE + 0.3) });
+    const SPARKLE = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0, 2093.0, 2349.32, 2637.02];
+    garland.forEach((g, i) => {
+      if (i % 2) return;
+      events.push({ t: S.RUN + g.litOff, play: (w) => sfx.bell(w, SPARKLE[Math.floor((i / GARLAND_N) * 5 + (i % 3))], 0.022, 0.4, Math.cos(g.th) * 0.6) });
+    });
+    [F.C6, F.E6, F.G6, F.C7].forEach((f, i) => events.push({ t: S.STAR_T + i * 0.07, play: (w) => sfx.bell(w, f, 0.085, 1.6, (i - 1.5) * 0.25) }));
+    for (const n of notes) {
+      const long = n.beats >= 2;
+      events.push({ t: n.t, play: (w) => { sfx.bell(w, n.freq, 0.17, long ? 1.5 : 1.0, 0.06); sfx.bell(w, n.freq * 2, 0.035, long ? 0.9 : 0.6, -0.1); } });
+    }
+    CHORDS.forEach((ch, bar) => {
+      const t0 = S.MUSIC_START + bar * 3 * BEAT;
+      if (!ch) {                                   // 마지막 마디: 아래에서 위로 굴리는 으뜸화음
+        [F.C4, F.E4, F.G4, F.C5, F.E5, F.G5, F.C6].forEach((f, i) => events.push({ t: t0 + i * 0.09, play: (w) => sfx.bell(w, f, 0.07, 1.9, (i - 3) * 0.15) }));
+        return;
+      }
+      [ch[0], ch[2], ch[1], ch[2], ch[1], ch[2]].forEach((f, i) => {
+        events.push({ t: t0 + i * 0.5 * BEAT, play: (w) => sfx.bell(w, i === 0 ? f / 2 : f, i === 0 ? 0.085 : 0.04, 0.8, i % 2 ? 0.3 : -0.25) });
+      });
+    });
+    events.sort((a, b) => a.t - b.t);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // 2. 소리: Web Audio로 그 자리에서 합성
+  // ════════════════════════════════════════════════════════════════
+  const sfx = (function () {
+    let ac = null, master, keyBus, bellBus, noise, muted = false;
+    function init() {
+      if (ac) return;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ac = new AC();
+      const comp = ac.createDynamicsCompressor();
+      comp.threshold.value = -12; comp.ratio.value = 4;
+      master = ac.createGain();
+      master.gain.value = muted ? 0 : 0.9;
+      master.connect(comp).connect(ac.destination);
+      keyBus = ac.createGain();
+      keyBus.gain.value = 0.7;
+      keyBus.connect(master);
+
+      // 종소리는 잔향으로도 보낸다 (지수 감쇠 잡음으로 만든 임펄스 응답)
+      bellBus = ac.createGain();
+      bellBus.connect(master);
+      const len = Math.floor(ac.sampleRate * 2.4), ir = ac.createBuffer(2, len, ac.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let n = 0; n < len; n++) d[n] = (Math.random() * 2 - 1) * Math.exp(-n / ac.sampleRate / 0.55);
+      }
+      const rev = ac.createConvolver(); rev.buffer = ir;
+      const revGain = ac.createGain(); revGain.gain.value = 0.26;
+      bellBus.connect(rev).connect(revGain).connect(master);
+
+      noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+      const nd = noise.getChannelData(0);
+      for (let n = 0; n < nd.length; n++) nd[n] = Math.random() * 2 - 1;
+    }
+    const panner = (pan) => {
+      if (!ac.createStereoPanner) return ac.createGain();
+      const p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan || 0)); return p;
+    };
+    function tick(when, gain, dur, hpFreq) {
+      const src = ac.createBufferSource(); src.buffer = noise;
+      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = hpFreq;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(gain, when);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      src.connect(hp).connect(g).connect(keyBus);
+      src.start(when, Math.random() * 1.5, dur + 0.01);
+    }
+    return {
+      init,
+      get ctx() { return ac; },
+      setMuted(m) { muted = m; if (master) master.gain.setTargetAtTime(m ? 0 : 0.9, ac.currentTime, 0.02); },
+      // 타건음 = 짧은 고역 잡음(딸깍) + 낮은 공명(통) + 키가 올라오는 소리
+      click(when, kind) {
+        if (!ac) return;
+        const gain = kind === 'enter' ? 1.25 : kind === 'space' ? 1.0 : 0.7 + Math.random() * 0.4;
+        const f = kind === 'enter' ? 96 : kind === 'space' ? 122 : 155 + Math.random() * 90;
+        const body = kind === 'key' ? 0.09 : 0.15;
+        const o = ac.createOscillator(); o.frequency.value = f;
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.32 * gain, when);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + body);
+        o.connect(g).connect(keyBus); o.start(when); o.stop(when + body + 0.02);
+        tick(when, 0.24 * gain, 0.022, 2200);
+        tick(when + 0.06 + Math.random() * 0.035, 0.07 * gain, 0.012, 3400);
+      },
+      // 오르골/종: 배음마다 감쇠 시간이 다른 사인파 묶음
+      bell(when, freq, gain, decay, pan) {
+        if (!ac) return;
+        const out = panner(pan);
+        out.connect(bellBus);
+        for (const [mul, amp, dk] of [[1, 1, 1], [2.0, 0.4, 0.6], [3.01, 0.15, 0.34], [5.42, 0.05, 0.18]]) {
+          if (freq * mul > 15000) continue;
+          const o = ac.createOscillator(); o.frequency.value = freq * mul;
+          const g = ac.createGain(), dur = decay * dk * 6;
+          g.gain.setValueAtTime(0.0001, when);
+          g.gain.exponentialRampToValueAtTime(amp * gain, when + 0.004);
+          g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+          o.connect(g).connect(out); o.start(when); o.stop(when + dur + 0.05);
+        }
+      },
+      // 점등 순간: 대역이 올라가는 부드러운 바람 소리
+      whoosh(when, dur) {
+        if (!ac) return;
+        const src = ac.createBufferSource(); src.buffer = noise; src.loop = true;
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 0.8;
+        bp.frequency.setValueAtTime(300, when);
+        bp.frequency.exponentialRampToValueAtTime(6000, when + dur);
+        const g = ac.createGain();
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.exponentialRampToValueAtTime(0.2, when + dur * 0.55);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+        src.connect(bp).connect(g).connect(bellBus);
+        src.start(when); src.stop(when + dur + 0.05);
+      },
+    };
+  })();
+
+  // ════════════════════════════════════════════════════════════════
+  // 3. 그림: render(t)는 시각 t의 한 프레임을 그리는 순수 함수
+  // ════════════════════════════════════════════════════════════════
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const MONO = '"JetBrains Mono","Nanum Gothic Coding","D2Coding",Menlo,monospace';
+  const SERIF = '"Gowun Batang","Apple SD Gothic Neo","Malgun Gothic",serif';
+  const SCRIPT = '"Great Vibes","Snell Roundhand",cursive';
+  const PEN = '"Nanum Pen Script","Gowun Batang",cursive';
+  let base = 1;                       // 논리 좌표 → 실제 픽셀 배율
+
+  // 배치: 가로 화면은 왼쪽 코드·오른쪽 트리, 세로 화면(휴대폰)은 위 코드·아래 트리.
+  // 피날레에서는 코드가 사라진 자리에 편지가 나온다.
+  // 화면 비율에 따라 논리 크기를 조금 늘리거나 줄여서 검은 띠 없이 꽉 채운다.
+  function landscapeLayout(aspect) {
+    const W = Math.round(clamp(1080 * aspect, 1720, 2500)), mid = W / 2;
+    return {
+      W, H: 1080, portrait: false,
+      ed: { x: mid - 890, y: 165, w: 880, k: 1 },
+      tree: { cx: mid + 480, baseY: 862, height: 680, radius: 280, font: 25 },
+      hudY: 1024, letter: { cx: mid - 450, cy: 540, k: 1 },
+    };
+  }
+  function portraitLayout(aspect) {
+    const H = Math.round(clamp(1080 / aspect, 1800, 2500)), spare = H - 1800;
+    const edY = 60 + spare * 0.22, treeBase = H - 215, treeH = 600 + Math.min(120, spare * 0.3);
+    return {
+      W: 1080, H, portrait: true,
+      ed: { x: 50, y: edY, w: 980, k: 1.33 },
+      tree: { cx: 540, baseY: treeBase, height: treeH, radius: 255 + Math.min(40, spare * 0.1), font: 28 },
+      hudY: H - 62, letter: { cx: 540, cy: (treeBase - treeH - 60) / 2 + 20, k: 1.4 },
+    };
+  }
+  let L = landscapeLayout(16 / 9);
+  // 에디터 내부 치수 (k=1 기준)
+  const E = { h: 752, title: 46, strip: 56, font: 24, cw: 14.4, lh: 38, gutter: 86, top: 36 };
+  const charX = (c) => L.ed.x + L.ed.k * (E.gutter + (c.col + c.w / 2) * E.cw);
+  const lineY = (line) => L.ed.y + L.ed.k * (E.title + E.top + line * E.lh);
+
+  function clamp(v, a = 0, b = 1) { return Math.min(b, Math.max(a, v)); }   // 위쪽 배치 계산에서도 쓰므로 함수 선언으로 둔다
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const easeOutBack = (t) => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
+  const rgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const css = (a) => `rgb(${Math.round(a[0])},${Math.round(a[1])},${Math.round(a[2])})`;
+  const mixArr = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+  const WHITE = [255, 255, 255];
+  const HEART = '♥\uFE0E';            // 뒤의 선택자는 이모지 대신 글자 모양을 쓰게 한다
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // 구문 강조: 파스텔 톤 (파이썬 전용 초소형 토크나이저)
+  const C = { text: '#fdeef0', comment: '#a8869a', keyword: '#ff9eb5', func: '#d9bcff', builtin: '#ffc4a3', string: '#ffe0ad', number: '#ffb38a', op: '#f7b9c6', punct: '#d8b9c4' };
+  const syn = new Array(CODE.length).fill(C.text);
+  (function highlight() {
+    const KEYWORDS = new Set(['def', 'for', 'in', 'return']);
+    const BUILTINS = new Set(['print', 'range']);
+    const paint = (from, to, color) => { for (let i = from; i < to; i++) syn[i] = color; };
+    const re = /(#[^\n]*)|("(?:\\.|[^"\\])*")|(\d+(?:\.\d+)?)|([A-Za-z_]\w*)|(\s+)|(.)/gy;
+    let m, prevWord = '';
+    while ((m = re.exec(CODE))) {
+      const s = m.index, e = re.lastIndex;
+      if (m[1]) paint(s, e, C.comment);
+      else if (m[2]) paint(s, e, C.string);
+      else if (m[3]) paint(s, e, C.number);
+      else if (m[4]) {
+        if (KEYWORDS.has(m[4])) paint(s, e, C.keyword);
+        else if (BUILTINS.has(m[4])) paint(s, e, C.builtin);
+        else if (prevWord === 'def' || CODE[e] === '(') paint(s, e, C.func);
+        prevWord = m[4];
+      } else if (m[6]) paint(s, e, '=+-*<>'.includes(m[6]) ? C.op : C.punct);
+    }
+  })();
+  const synRgb = syn.map(rgb);
+
+  // 트리 색: 아래는 로즈, 위로 갈수록 크림
+  const ROSE = rgb('#ee8fa6'), BLUSH = rgb('#f8bcc9'), CREAM = rgb('#ffeeda'), COCOA = rgb('#c79a88');
+  const FAR = rgb('#3a1a2a');         // 뒤쪽 글자가 가라앉는 색
+  for (const c of cells) {
+    if (c.kind === 'trunk') c.base = mixArr(COCOA, CREAM, c.r2 * 0.25);
+    else {
+      const up = clamp(c.hf * 1.1);
+      c.base = mixArr(mixArr(ROSE, BLUSH, clamp(up * 2)), CREAM, clamp(up * 2 - 1) * 0.9 + c.r2 * 0.12);
+    }
+    c.heartCol = c.r3 < 0.5 ? rgb('#ff6f91') : rgb('#ffd27a');
+  }
+
+  // 빛 번짐은 미리 그려 둔 작은 그림을 찍어서 낸다 (글자마다 그림자를 주는 것보다 훨씬 빠르다)
+  function glowSprite(col, core) {
+    const s = document.createElement('canvas');
+    s.width = s.height = 128;
+    const g = s.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    r.addColorStop(0, `rgba(255,255,255,${core})`);
+    r.addColorStop(0.12, `rgba(${col},0.85)`);
+    r.addColorStop(0.4, `rgba(${col},0.22)`);
+    r.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = r;
+    g.fillRect(0, 0, 128, 128);
+    return s;
+  }
+  const GLOW = [glowSprite('255,206,140', 1), glowSprite('255,246,236', 1), glowSprite('255,160,186', 1)];   // 금, 흰, 분홍
+  function softSprite(col) {
+    const s = document.createElement('canvas');
+    s.width = s.height = 128;
+    const g = s.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    r.addColorStop(0, `rgba(${col},0.5)`);
+    r.addColorStop(0.45, `rgba(${col},0.17)`);
+    r.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = r;
+    g.fillRect(0, 0, 128, 128);
+    return s;
+  }
+  const SOFT = [softSprite('255,200,150'), softSprite('255,170,195')];
+  const SNOWFLAKE = glowSprite('255,250,250', 0.9);
+
+  const prng = mulberry32(42);
+  const bokeh = Array.from({ length: 18 }, () => ({ x: prng(), y: prng(), r: 0.08 + prng() * 0.16, a: 0.05 + prng() * 0.07, w: 0.1 + prng() * 0.2, ph: prng() * 6.28, k: prng() < 0.5 ? 0 : 1 }));
+  const dust = Array.from({ length: 80 }, () => ({ x: prng(), y: prng(), r: 0.6 + prng() * 1.2, a: 0.1 + prng() * 0.3, w: 0.4 + prng() * 1.4, ph: prng() * 6.28 }));
+  const snow = Array.from({ length: 150 }, () => {
+    const depth = prng();
+    return { x: prng() * 1.1 - 0.05, delay: prng() * 9, sp: 0.035 + depth * 0.07, size: 6 + depth * 20, a: 0.25 + depth * 0.55, amp: 0.008 + prng() * 0.02, fr: 0.5 + prng() * 1.1, ph: prng() * 6.28 };
+  });
+  const floatHearts = Array.from({ length: 9 }, () => ({ x: (prng() - 0.5) * 2.2, delay: prng() * 7, sp: 0.03 + prng() * 0.03, size: 16 + prng() * 16, ph: prng() * 6.28 }));
+
+  // 3D → 화면. 시간에 따라 각도만 돌린다
+  const SPIN = 0.42, FOCAL = 1150, TILT = 0.15;
+  function project(c, t, out) {
+    const T = L.tree, a = c.th + t * SPIN, r = c.rf * T.radius;
+    const x3 = Math.cos(a) * r, z3 = Math.sin(a) * r;
+    const p = FOCAL / (FOCAL + z3);                // 원근: 멀수록 작게
+    const mid = T.baseY - T.height / 2, y3 = T.baseY - c.hf * T.height;
+    out.x = T.cx + x3 * p;
+    out.y = mid + (y3 - mid) * p - z3 * TILT;      // 살짝 위에서 내려다보는 각도
+    out.s = p;
+    out.z = z3;
+    out.front = clamp(0.5 - (0.5 * z3) / T.radius); // 1 앞, 0 뒤
+    return out;
+  }
+
+  function drawBackground(t, lit) {
+    const { W, H } = L;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#22101d'); g.addColorStop(0.55, '#170a13'); g.addColorStop(1, '#0d050b');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = 'lighter';
+    for (const b of bokeh) {                       // 멀리 번진 조명
+      const r = b.r * Math.max(W, H) * 0.5;
+      ctx.globalAlpha = b.a * (0.45 + 0.55 * lit) * (0.7 + 0.3 * Math.sin(t * b.w + b.ph));
+      ctx.drawImage(SOFT[b.k], b.x * W + Math.sin(t * b.w * 0.7 + b.ph) * 30 - r, b.y * H - r, r * 2, r * 2);
+    }
+    // 트리 뒤의 은은한 빛
+    const T = L.tree, tr = T.height * (0.75 + 0.5 * lit);
+    ctx.globalAlpha = 0.16 + 0.34 * lit;
+    ctx.drawImage(SOFT[1], T.cx - tr, T.baseY - T.height * 0.5 - tr, tr * 2, tr * 2);
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.fillStyle = '#ffd9e2';
+    for (const d of dust) {
+      ctx.globalAlpha = d.a * (0.55 + 0.45 * Math.sin(t * d.w + d.ph));
+      ctx.beginPath(); ctx.arc(d.x * W, d.y * H, d.r, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawSnow(t) {
+    const t0 = S.RUN + 0.6;
+    if (t < t0) return;
+    const { W, H } = L;
+    ctx.globalCompositeOperation = 'lighter';
+    for (const s of snow) {
+      const tau = t - t0 - s.delay * 0.5;
+      if (tau < 0) continue;
+      ctx.globalAlpha = s.a * clamp(tau / 0.8);
+      const y = ((s.sp * H * tau) % (H + 80)) - 40;
+      const x = (s.x + Math.sin(tau * s.fr + s.ph) * s.amp) * W;
+      ctx.drawImage(SNOWFLAKE, x - s.size / 2, y - s.size / 2, s.size, s.size);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    // 트리 주변에서 천천히 떠오르는 작은 하트
+    const T = L.tree;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const h of floatHearts) {
+      const tau = t - S.MUSIC_START - h.delay;
+      if (tau < 0) continue;
+      const p = (tau * h.sp * 2.2) % 1;
+      ctx.globalAlpha = 0.55 * Math.sin(Math.PI * p);
+      ctx.font = `${h.size}px ${SERIF}`;
+      ctx.fillStyle = '#ffa9be';
+      ctx.fillText(HEART, T.cx + h.x * T.radius + Math.sin(tau * 0.9 + h.ph) * 22, T.baseY - p * T.height * 1.15);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawEditor(t, alpha) {
+    const k = L.ed.k, w = L.ed.w / k, h = E.h;
+    ctx.save();
+    ctx.translate(L.ed.x, L.ed.y);
+    ctx.scale(k, k);
+    ctx.globalAlpha = alpha;
+
+    // 장밋빛 유리 카드
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 60 * base * k; ctx.shadowOffsetY = 22 * base * k;
+    roundRect(0, 0, w, h, 22);
+    ctx.fillStyle = '#24121e'; ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.save();
+    roundRect(0, 0, w, h, 22);
+    ctx.clip();
+    const sheen = ctx.createLinearGradient(0, 0, w, h);
+    sheen.addColorStop(0, 'rgba(255,190,210,0.10)'); sheen.addColorStop(0.5, 'rgba(255,190,210,0.02)'); sheen.addColorStop(1, 'rgba(255,214,160,0.07)');
+    ctx.fillStyle = sheen; ctx.fillRect(0, 0, w, h);
+    const stripY = h - E.strip;
+    ctx.fillStyle = 'rgba(255,220,230,0.05)'; ctx.fillRect(0, 0, w, E.title);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(0, stripY, w, E.strip);
+    ctx.fillStyle = 'rgba(255,200,215,0.12)';
+    ctx.fillRect(0, E.title, w, 1); ctx.fillRect(0, stripY, w, 1);
+
+    ['#ff9eb5', '#ffcfa3', '#fff0c9'].forEach((col, i) => {
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(26 + i * 22, E.title / 2, 6.5, 0, 6.2832); ctx.fill();
+    });
+    ctx.font = `500 15px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#c9a3b4';
+    ctx.fillText('christmas.py', w / 2, E.title / 2 + 1);
+
+    // 지금까지 친 글자 수와 커서 위치
+    let n = 0;
+    while (n < chars.length && chars[n].t <= t) n++;
+    let curLine = 0, curCol = 0, lastKeyT = 0;
+    if (n > 0) {
+      const last = chars[n - 1];
+      if (last.ch === '\n') { curLine = last.line + 1; curCol = 0; } else { curLine = last.line; curCol = last.col + last.w; }
+      for (let i = n - 1; i >= 0; i--) if (chars[i].key) { lastKeyT = chars[i].t; break; }
+    }
+    const editing = t < S.CMD_START - 0.3;
+    const ly = (line) => E.title + E.top + line * E.lh;
+
+    if (editing) {
+      ctx.fillStyle = 'rgba(255,200,215,0.06)';
+      ctx.fillRect(0, ly(curLine) - E.lh / 2, w, E.lh);
+    }
+    ctx.font = `500 16px ${MONO}`; ctx.textAlign = 'right';
+    for (let i = 0; i <= curLine && i < LINE_COUNT; i++) {
+      ctx.fillStyle = i === curLine && editing ? '#c9a3b4' : '#6d4a5c';
+      ctx.fillText(String(i + 1), 58, ly(i) + 1);
+    }
+
+    ctx.font = `500 ${E.font}px ${MONO}`; ctx.textAlign = 'center';
+    for (let i = 0; i < n; i++) {
+      const c = chars[i];
+      if (c.ch === ' ' || c.ch === '\n') continue;
+      const age = t - c.t;                         // 막 친 글자는 잠깐 밝게 빛난다
+      ctx.fillStyle = age < 0.25 ? css(mixArr(WHITE, synRgb[c.i], age / 0.25)) : syn[c.i];
+      ctx.fillText(c.ch, E.gutter + (c.col + c.w / 2) * E.cw, ly(c.line) + 1);
+    }
+
+    if (mode === 'manual' && n === 0) {           // 직접 치기 안내
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#c9a3b4';
+      ctx.globalAlpha = alpha * (0.55 + 0.45 * Math.sin(t * 3));
+      ctx.fillText(coarse ? '# 화면을 톡톡 눌러 보세요' : '# 아무 키나 눌러 보세요', E.gutter + 22, ly(0) + 1);
+      ctx.globalAlpha = alpha;
+    }
+
+    // 커서: 치는 동안은 켜져 있고, 쉴 때만 깜빡인다
+    if (editing) {
+      const idle = t - lastKeyT;
+      if (idle < 0.45 || idle % 1.0 < 0.55) {
+        ctx.fillStyle = '#ff9eb5';
+        ctx.fillRect(E.gutter + curCol * E.cw, ly(curLine) - 15, 2.5, 30);
+      }
+    }
+
+    // 아래 터미널 줄
+    const ty = stripY + E.strip / 2 + 1;
+    ctx.font = `500 19px ${MONO}`; ctx.textAlign = 'left';
+    ctx.fillStyle = '#ff9eb5'; ctx.fillText('$', 30, ty);
+    let cn = 0;
+    while (cn < S.cmdTimes.length && S.cmdTimes[cn] <= t) cn++;
+    ctx.fillStyle = '#fdeef0'; ctx.fillText(CMD.slice(0, cn), 56, ty);
+    if (!editing && t < S.CMD_ENTER) {
+      const idle = t - (cn ? S.cmdTimes[cn - 1] : S.CMD_START - 0.3);
+      if (idle < 0.3 || idle % 1.0 < 0.55) {
+        ctx.fillStyle = 'rgba(255,158,181,0.85)';
+        ctx.fillRect(56 + cn * 11.4 + 1, ty - 13, 11, 25);
+      }
+    }
+    ctx.restore();
+
+    roundRect(0.5, 0.5, w - 1, h - 1, 22);
+    ctx.strokeStyle = 'rgba(255,200,215,0.22)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+
+  // 음표가 울릴 때마다 전구 세 무리가 번갈아 반짝인다
+  const beatFlash = [0, 0, 0];
+  function updateBeat(t) {
+    beatFlash[0] = beatFlash[1] = beatFlash[2] = 0;
+    for (let i = 0; i < notes.length; i++) {
+      if (t < notes[i].t) break;
+      const v = Math.exp(-(t - notes[i].t) / 0.5);
+      if (v > beatFlash[i % 3]) beatFlash[i % 3] = v;
+    }
+  }
+
+  function drawGround(lit) {
+    const T = L.tree;
+    ctx.save();
+    ctx.translate(T.cx, T.baseY + T.height * 0.12);
+    ctx.scale(1, 0.11);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.35 + 0.45 * lit;
+    const r = T.radius * 1.5;
+    ctx.drawImage(SOFT[lit > 0.5 ? 0 : 1], -r, -r, r * 2, r * 2);
+    ctx.restore();
+  }
+
+  const P = { x: 0, y: 0, s: 1, z: 0, front: 1 };
+  const drawList = [], flyers = [];
+  function glyph(ch, x, y, scale, font) {           // 크기를 글꼴 문자열 대신 변환으로 준다 (빠르다)
+    ctx.setTransform(base * scale, 0, 0, base * scale, base * x, base * y);
+    ctx.fillText(ch, 0, 1);
+  }
+
+  function drawTree(t) {
+    const T = L.tree;
+    drawList.length = 0; flyers.length = 0;
+    let landed = 0;
+
+    for (const c of cells) {
+      const ct = c.src.t;
+      if (t < ct) continue;
+      if (t < ct + c.dur) { flyers.push(c); continue; }
+      landed++;
+      project(c, t, P);
+      c.px = P.x; c.py = P.y; c.ps = P.s; c.pz = P.z; c.pf = P.front;
+      drawList.push(c);
+    }
+    for (const g of garland) {
+      if (t < S.RUN + g.litOff) continue;
+      project(g, t, P);
+      g.px = P.x; g.py = P.y; g.ps = P.s; g.pz = P.z; g.pf = P.front;
+      drawList.push(g);
+    }
+    drawList.sort((a, b) => b.pz - a.pz);          // 먼 것부터 그린다
+
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 ${T.font}px ${MONO}`;
+    for (const c of drawList) {
+      if (c.kind === 'light') {                    // 전구
+        const lt = t - (S.RUN + c.litOff), bf = beatFlash[c.k % 3];
+        const tw = 0.5 + 0.5 * Math.sin(t * c.w + c.ph);
+        const power = clamp(0.35 + 0.4 * tw + 0.6 * bf) * (0.45 + 0.55 * c.pf);
+        const size = T.font * 2.1 * c.ps * (0.7 + 0.6 * power) * easeOutBack(clamp(lt / 0.5)) + 30 * Math.exp(-lt / 0.2);
+        ctx.setTransform(base, 0, 0, base, 0, 0);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = clamp(0.35 + 0.65 * power);
+        ctx.drawImage(GLOW[c.color], c.px - size / 2, c.py - size / 2, size, size);
+        ctx.globalCompositeOperation = 'source-over';
+        continue;
+      }
+      const age = t - (c.src.t + c.dur);
+      const lt = t - (S.RUN + c.litOff);
+      const pop = age < 0.4 ? 1 + 0.55 * (1 - easeOutCubic(age / 0.4)) : 1;
+      const landFlash = age < 1 ? Math.exp(-age / 0.2) : 0;
+      let col = c.base, ch = c.ch, scale = c.ps * pop;
+
+      if (lt >= 0) {
+        const wave = Math.exp(-lt / 0.35);
+        if (c.heart) {                             // 점등되면 하트로
+          const bf = beatFlash[Math.floor(c.r1 * 3)];
+          ch = HEART;
+          col = mixArr(c.heartCol, WHITE, clamp(0.5 * bf + wave));
+          scale *= 1.25 * easeOutBack(clamp(lt / 0.45)) * (1 + 0.22 * bf + 0.06 * Math.sin(t * 3 + c.r4 * 6.28));
+        } else col = mixArr(mixArr(c.base, WHITE, 0.12), WHITE, 0.8 * wave);
+      }
+      if (landFlash > 0.02) col = mixArr(col, WHITE, 0.85 * landFlash);
+      // 뒤쪽 글자는 어둡고 흐리게 가라앉혀서 입체감을 낸다
+      col = mixArr(FAR, col, 0.3 + 0.7 * c.pf);
+      ctx.globalAlpha = (lt >= 0 ? 0.5 : 0.42) + 0.5 * c.pf;
+      ctx.fillStyle = css(col);
+      glyph(ch, c.px, c.py, scale);
+      if (landFlash > 0.05) {                      // 내려앉는 순간의 작은 반짝임
+        ctx.setTransform(base, 0, 0, base, 0, 0);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.7 * landFlash;
+        const sz = T.font * 2.6;
+        ctx.drawImage(GLOW[2], c.px - sz / 2, c.py - sz / 2, sz, sz);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+    ctx.setTransform(base, 0, 0, base, 0, 0);
+    ctx.globalAlpha = 1;
+
+    drawStar(t);
+
+    // 날아가는 글자와 잔상. 도착점이 회전하고 있으므로 매 프레임 다시 계산한다
+    const lk = L.ed.k;
+    for (const c of flyers) {
+      const p = (t - c.src.t) / c.dur;
+      project(c, t, P);
+      const ex = P.x, ey = P.y, es = P.s, sx = charX(c.src), sy = lineY(c.src.line);
+      const mx = (sx + ex) / 2 + (c.r3 - 0.5) * 180, my = Math.min(sy, ey) - (70 + c.r4 * 170) * lk;
+      for (let j = 4; j >= 0; j--) {
+        const pj = p - j * 0.012;
+        if (pj <= 0) continue;
+        const e = easeInOutCubic(pj), q = 1 - e, arc = Math.sin(Math.PI * pj);
+        const x = q * q * sx + 2 * q * e * mx + e * e * ex, y = q * q * sy + 2 * q * e * my + e * e * ey;
+        const size = lerp(E.font * lk, L.tree.font * es, e) * (1 + 0.5 * arc);
+        if (j === 0) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.5 * arc;
+          ctx.drawImage(GLOW[2], x - size * 1.3, y - size * 1.3, size * 2.6, size * 2.6);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(arc * (c.r3 - 0.5) * 2.6);
+        ctx.globalAlpha = j === 0 ? 1 : 0.2 * (1 - j / 5);
+        ctx.font = `700 ${size.toFixed(1)}px ${MONO}`;
+        ctx.fillStyle = css(mixArr(mixArr(synRgb[c.src.i], c.base, e), WHITE, 0.4 * arc));
+        ctx.fillText(c.ch, 0, 1);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+    return landed;
+  }
+
+  function drawStar(t) {
+    const a = t - S.STAR_T;
+    if (a < 0) return;
+    const T = L.tree, x = T.cx, y = T.baseY - T.height * 1.045 - TILT * 0, k = T.font / 25;
+    const bf = Math.max(beatFlash[0], beatFlash[1], beatFlash[2]);
+    const s = easeOutBack(clamp(a / 0.6)) * k;
+    const breathe = 0.85 + 0.15 * Math.sin(t * 2.1) + 0.28 * bf;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalCompositeOperation = 'lighter';
+    const hr = 150 * breathe * s;
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(GLOW[0], -hr, -hr, hr * 2, hr * 2);
+    for (let i = 0; i < 4; i++) {                  // 십자 광선
+      const len = (i % 2 ? 60 : 125) * breathe * s;
+      const g = ctx.createLinearGradient(-len, 0, len, 0);
+      g.addColorStop(0, 'rgba(255,225,170,0)'); g.addColorStop(0.5, 'rgba(255,240,205,0.6)'); g.addColorStop(1, 'rgba(255,225,170,0)');
+      ctx.save();
+      ctx.rotate((i * Math.PI) / 4 + Math.sin(t * 0.4) * 0.06);
+      ctx.fillStyle = g;
+      ctx.fillRect(-len, -1.1, len * 2, 2.2);
+      ctx.restore();
+    }
+    if (a < 1) {                                   // 켜지는 순간 퍼지는 고리
+      ctx.globalAlpha = 0.6 * (1 - a);
+      ctx.strokeStyle = '#ffe9c4'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 26 + easeOutCubic(a) * 260 * k, 0, 6.2832); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+
+    // 별은 글꼴에 기대지 않고 직접 그린다 (기기마다 모양이 달라지지 않게)
+    const R = 34 * s * (1 + 0.1 * bf), r = R * 0.42;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const ang = -Math.PI / 2 + (i * Math.PI) / 5, rad = i % 2 ? r : R;
+      ctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+    }
+    ctx.closePath();
+    const sg = ctx.createLinearGradient(0, -R, 0, R);
+    sg.addColorStop(0, '#fffbe6'); sg.addColorStop(1, '#ffcf87');
+    ctx.fillStyle = sg;
+    ctx.shadowColor = '#ffbf66'; ctx.shadowBlur = 30 * base;
+    ctx.lineJoin = 'round';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHud(t, landed) {
+    const T = L.tree, k = L.ed.k;
+    const hudA = (1 - clamp((t - S.RUN) / 0.5)) * clamp((t - 0.8) / 0.8);
+    if (hudA <= 0) return;
+    // 하트로 채우는 진행 표시
+    const N = 10, frac = landed / cells.length, step = 30 * k;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `${22 * k}px ${SERIF}`;
+    for (let i = 0; i < N; i++) {
+      const fill = clamp(frac * N - i);
+      ctx.globalAlpha = hudA * (0.22 + 0.78 * fill);
+      ctx.fillStyle = css(mixArr(rgb('#6d4a5c'), rgb('#ff8fab'), fill));
+      const pulse = fill > 0 && fill < 1 ? 1.25 : 1;
+      ctx.save();
+      ctx.translate(T.cx + (i - (N - 1) / 2) * step - 26 * k, L.hudY);
+      ctx.scale(pulse, pulse);
+      ctx.fillText(HEART, 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = hudA;
+    ctx.font = `400 ${17 * k}px ${SERIF}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#b08da0';
+    ctx.fillText(`${Math.round(frac * 100)}%`, T.cx + (N / 2) * step - 22 * k, L.hudY + 1);
+    ctx.globalAlpha = 1;
+  }
+
+  // 피날레: 코드가 있던 자리에 편지가 나온다
+  const letterLines = [];
+  if (GIFT.to) letterLines.push({ text: `${GIFT.to}에게`, kind: 'to' });
+  GIFT.message.forEach((text) => letterLines.push({ text, kind: text ? 'body' : 'gap' }));
+  if (GIFT.from) letterLines.push({ text: `— ${GIFT.from}`, kind: 'from' });
+
+  function drawLetter(t) {
+    const t0 = S.MUSIC_START;
+    if (t < t0) return;
+    const { cx, cy, k } = L.letter;
+    const HEIGHTS = { to: 70, body: 58, gap: 26, from: 84 };
+    const bodyH = letterLines.reduce((h, l) => h + HEIGHTS[l.kind], 0);
+    let y = cy - (150 + 60 + bodyH) * k / 2 + 75 * k;
+
+    // "Merry Christmas"를 왼쪽에서 오른쪽으로 써 내려가듯 드러낸다
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `${118 * k}px ${SCRIPT}`;
+    const title = 'Merry Christmas', tw = ctx.measureText(title).width;
+    const reveal = easeInOutCubic(clamp((t - t0 - 0.2) / 2.4));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx - tw / 2 - 40, y - 110 * k, (tw + 80) * reveal, 220 * k);
+    ctx.clip();
+    const tg = ctx.createLinearGradient(0, y - 60 * k, 0, y + 60 * k);
+    tg.addColorStop(0, '#fff3dc'); tg.addColorStop(1, '#ffc98f');
+    ctx.fillStyle = tg;
+    ctx.shadowColor = 'rgba(255,170,110,0.55)'; ctx.shadowBlur = 26 * base;
+    ctx.fillText(title, cx, y);
+    ctx.restore();
+    y += 100 * k;
+
+    // 가는 선과 하트
+    const da = clamp((t - t0 - 2.2) / 0.8);
+    if (da > 0) {
+      ctx.globalAlpha = da * 0.8;
+      ctx.strokeStyle = '#d9a3b3'; ctx.lineWidth = 1;
+      const half = 110 * k * easeOutCubic(da);
+      ctx.beginPath();
+      ctx.moveTo(cx - 22 * k - half, y); ctx.lineTo(cx - 22 * k, y);
+      ctx.moveTo(cx + 22 * k, y); ctx.lineTo(cx + 22 * k + half, y);
+      ctx.stroke();
+      ctx.font = `${18 * k}px ${SERIF}`;
+      ctx.fillStyle = '#ff9eb5';
+      ctx.fillText(HEART, cx, y + 1);
+    }
+    y += 34 * k;
+
+    let appear = t0 + 3.2;
+    for (const l of letterLines) {
+      const lh = HEIGHTS[l.kind] * k;
+      if (l.kind !== 'gap') {
+        const a = clamp((t - appear) / 1.1);
+        if (a > 0) {
+          ctx.globalAlpha = a;
+          if (l.kind === 'from') { ctx.font = `${50 * k}px ${PEN}`; ctx.fillStyle = '#f7b9c6'; }
+          else if (l.kind === 'to') { ctx.font = `700 ${34 * k}px ${SERIF}`; ctx.fillStyle = '#ffd9a0'; }
+          else { ctx.font = `400 ${31 * k}px ${SERIF}`; ctx.fillStyle = '#fdeef0'; }
+          ctx.fillText(l.text, cx, y + lh / 2 + (1 - easeOutCubic(a)) * 14 * k);
+        }
+        appear += l.kind === 'to' ? 1.3 : 1.7;
+      }
+      y += lh;
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function render(t) {
+    const { W, H } = L;
+    ctx.setTransform(base, 0, 0, base, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0;
+
+    const lit = clamp((t - S.RUN) / (WAVE + 0.4));
+    const edFade = 1 - clamp((t - S.RUN - 0.5) / 1.6);     // 점등 후 코드는 사라진다
+
+    updateBeat(t);
+    drawBackground(t, lit);
+    drawSnow(t);
+    drawGround(lit);
+    if (edFade > 0) drawEditor(t, edFade);
+    const landed = drawTree(t);
+    drawHud(t, landed);
+    drawLetter(t);
+
+    const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.62);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(6,2,5,0.62)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, W, H);
+
+    const fade = 1 - clamp(t / 1.0);
+    if (fade > 0) { ctx.fillStyle = `rgba(13,5,11,${fade})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // 4. 조작: 시계, 모드, 입력, 조작 막대
+  // ════════════════════════════════════════════════════════════════
+  const $ = (id) => document.getElementById(id);
+  const ui = { intro: $('intro'), play: $('play'), restart: $('restart'), seek: $('seek'), status: $('status'), mode: $('mode'), sound: $('sound') };
+  const coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  if (GIFT.to) $('introTitle').textContent = `${GIFT.to}에게, 작은 크리스마스 선물이 도착했어요`;
+  if (coarse) $('self').textContent = '화면을 눌러서 직접 트리 키우기';
+
+  let mode = 'auto';        // 'auto' | 'manual'
+  let started = false, paused = false, soundOn = true;
+  let now = 0;              // 장면 시계(초)
+  let nextIdx = 0;          // 직접 치기: 다음에 칠 글자
+  let seeking = false;
+
+  function begin(m) {
+    mode = m;
+    sfx.init();
+    if (sfx.ctx && sfx.ctx.state === 'suspended') sfx.ctx.resume();
+    clearSchedule();
+    if (mode === 'auto') {
+      chars.forEach((c) => (c.t = c.autoT));
+      chars.forEach((c) => c.key && events.push({ t: c.t, play: (w) => sfx.click(w, c.key) }));
+      scheduleFinale(AUTO_TYPE_END);
+    } else {
+      chars.forEach((c) => (c.t = Infinity));
+    }
+    nextIdx = 0; now = 0; started = true; paused = false;
+    ui.intro.classList.add('hide');
+    ui.play.disabled = ui.restart.disabled = ui.mode.disabled = false;
+    ui.seek.disabled = mode !== 'auto';
+    ui.mode.textContent = mode === 'auto' ? '직접 치기' : '자동 재생';
+    syncPlayButton();
+  }
+
+  function setPaused(p) {
+    if (!started) return;
+    paused = p;
+    if (sfx.ctx) (p ? sfx.ctx.suspend() : sfx.ctx.resume());
+    syncPlayButton();
+  }
+  const syncPlayButton = () => { ui.play.textContent = paused ? '▶' : '❚❚'; };
+
+  function seekTo(t) {
+    now = t;
+    evPtr = events.findIndex((e) => e.t >= t);
+    if (evPtr < 0) evPtr = events.length;
+  }
+
+  // 직접 치기: 키 한 번(또는 터치 한 번)에 글자 몇 개가 쳐진다
+  function typeKeys(count) {
+    if (!started || mode !== 'manual' || paused || nextIdx >= chars.length) return;
+    let when = Math.max(now, nextIdx ? chars[nextIdx - 1].t : 0), typed = 0;
+    const ac = sfx.ctx;
+    while (nextIdx < chars.length && (typed < count || !chars[nextIdx].key)) {
+      const c = chars[nextIdx++];
+      c.t = when;
+      if (c.key) {
+        if (ac) sfx.click(ac.currentTime + (when - now), c.key);
+        typed++;
+        when += 0.04;
+      }
+    }
+    if (nextIdx >= chars.length) scheduleFinale(when);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || !started) return;
+    if (mode === 'manual' && nextIdx < chars.length) {
+      if (e.key === 'Tab' || e.key === 'Escape' || /^F\d+$/.test(e.key)) return;
+      e.preventDefault();
+      typeKeys(2);
+    } else if (e.code === 'Space') {
+      e.preventDefault();
+      setPaused(!paused);
+    }
+  });
+  cv.addEventListener('pointerdown', () => typeKeys(4));
+
+  $('open').addEventListener('click', () => begin('auto'));
+  $('self').addEventListener('click', () => begin('manual'));
+  ui.play.addEventListener('click', () => { setPaused(!paused); ui.play.blur(); });
+  ui.restart.addEventListener('click', () => { begin(mode); ui.restart.blur(); });
+  ui.mode.addEventListener('click', () => { begin(mode === 'auto' ? 'manual' : 'auto'); ui.mode.blur(); });
+  ui.sound.addEventListener('click', () => {
+    soundOn = !soundOn;
+    sfx.setMuted(!soundOn);
+    ui.sound.textContent = soundOn ? '소리 켬' : '소리 끔';
+    ui.sound.blur();
+  });
+  ui.seek.addEventListener('input', () => { seeking = true; seekTo((ui.seek.value / 1000) * (S.MUSIC_END + 2)); });
+  ui.seek.addEventListener('change', () => { seeking = false; ui.seek.blur(); });
+
+  // 창 모양에 맞는 배치를 고르고 비율을 유지하며 채운다. 고해상도 화면은 2배까지만 그린다
+  function fit() {
+    const stage = $('stage'), sw = stage.clientWidth, sh = stage.clientHeight;
+    L = sw / sh < 0.85 ? portraitLayout(sw / sh) : landscapeLayout(sw / sh);
+    const scale = Math.min(sw / L.W, sh / L.H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.style.width = Math.floor(L.W * scale) + 'px';
+    cv.style.height = Math.floor(L.H * scale) + 'px';
+    cv.width = Math.max(1, Math.round(L.W * scale * dpr));
+    cv.height = Math.max(1, Math.round(L.H * scale * dpr));
+    base = cv.width / L.W;
+  }
+  window.addEventListener('resize', fit);
+
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  let lastTs = 0;
+  function frame(ts) {
+    const dt = Math.min(0.1, (ts - lastTs) / 1000 || 0);
+    lastTs = ts;
+    if (started && !paused && !seeking) now += dt;
+
+    // 곧 일어날 소리 사건을 오디오 시계에 미리 예약한다 (프레임 지터와 무관하게 정확)
+    const ac = sfx.ctx;
+    if (started && !paused && ac) {
+      while (evPtr < events.length && events[evPtr].t < now + 0.12) {
+        const ev = events[evPtr++];
+        if (ev.t > now - 0.05 && !seeking) ev.play(ac.currentTime + Math.max(0, ev.t - now));
+      }
+    }
+
+    render(started ? now : 1.2);
+
+    if (started) {
+      if (mode === 'auto') {
+        const end = S.MUSIC_END + 2;
+        if (!seeking) ui.seek.value = Math.round(clamp(now / end) * 1000);
+        ui.status.textContent = `${fmt(Math.min(now, end))} / ${fmt(end)}`;
+      } else {
+        let typedKeys = 0;
+        for (let i = 0; i < nextIdx; i++) if (chars[i].key) typedKeys++;
+        ui.seek.value = Math.round((typedKeys / KEY_TOTAL) * 1000);
+        ui.status.textContent = nextIdx >= chars.length ? '완성!' : `${typedKeys} / ${KEY_TOTAL} 타`;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  clearSchedule();
+  chars.forEach((c) => (c.t = Infinity));
+  fit();
+  // 캔버스 글자는 글꼴이 내려온 뒤에 그려야 한다. 쓰일 글자를 알려 줘서 필요한 조각만 받는다
+  const allText = CODE + GIFT.message.join('') + GIFT.to + GIFT.from + 'Merry Christmas—에게화면을톡눌러보세요아무키나';
+  const fontsReady = document.fonts && document.fonts.load
+    ? Promise.all([
+        document.fonts.load('500 24px "JetBrains Mono"', allText), document.fonts.load('700 24px "JetBrains Mono"', allText),
+        document.fonts.load('400 24px "Nanum Gothic Coding"', allText), document.fonts.load('700 24px "Nanum Gothic Coding"', allText),
+        document.fonts.load('400 31px "Gowun Batang"', allText), document.fonts.load('700 34px "Gowun Batang"', allText),
+        document.fonts.load('50px "Nanum Pen Script"', allText), document.fonts.load('118px "Great Vibes"', 'Merry Christmas'),
+      ]).catch(() => {})
+    : Promise.resolve();
+  Promise.race([fontsReady, new Promise((r) => setTimeout(r, 3000))]).then(() => requestAnimationFrame(frame));
+
+  // 시험용 손잡이
+  window.__tree = { seekTo, begin, state: () => ({ mode, now, started, paused, nextIdx, total: chars.length, run: S.RUN, musicEnd: S.MUSIC_END, events: events.length, cells: cells.length, layout: L.portrait ? 'portrait' : 'landscape', size: L.W + 'x' + L.H }) };
+})();
+</script>
+</body>
+</html>
