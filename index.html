@@ -557,6 +557,73 @@ print("메리 크리스마스,", you)`;
     });
   }
 
+  // 글자로 빚은 공: 곰인형과 눈사람의 재료 (공 표면에 점을 고르게 뿌리고 점마다 글자 면을 세운다)
+  {
+    const ball = (c, rad, text, color, size, t0) => {
+      const n = Math.max(6, Math.round((4 * Math.PI * rad * rad) / Math.pow(size * 0.66, 2)));
+      for (let i = 0; i < n; i++) {
+        const y = 1 - (2 * (i + 0.5)) / n, rr = Math.sqrt(1 - y * y), a = i * 2.39996;
+        const nrm = [Math.cos(a) * rr, y, Math.sin(a) * rr];
+        let r = cross([0, 1, 0], nrm);
+        const rl = Math.hypot(r[0], r[1], r[2]);
+        r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
+        const at = t0 + (1 - y) * 0.25 + grng() * 0.2;
+        extras.push({ p: [c[0] + nrm[0] * rad, c[1] + nrm[1] * rad, c[2] + nrm[2] * rad], right: r, up: cross(nrm, r), g: glyph(text[i % text.length], 'mono'), color, h: 0, size, seed: grng(), reveal: at, lit: at });
+      }
+    };
+    // 장난감 하나의 좌표계: 트리 바깥을 바라보고 앉는다 (fw 앞, side 옆, up 위)
+    const toy = (ang, rad) => {
+      const f = [Math.cos(ang), 0, Math.sin(ang)], s = [-f[2], 0, f[0]], o = [f[0] * rad, -TRUNK, f[2] * rad];
+      const P = (fw, side, up) => [o[0] + f[0] * fw + s[0] * side, o[1] + up, o[2] + f[2] * fw + s[2] * side];
+      const dot = (pos, ch, color, size, t0) => extras.push({ p: pos, right: cross([0, 1, 0], f), up: [0, 1, 0], g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: t0, lit: t0 });
+      const ring = (c, rr, ch, color, size, t0) => {
+        const n = Math.round((Math.PI * 2 * rr) / (size * 0.5));
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2, nrm = [Math.cos(a), 0, Math.sin(a)];
+          extras.push({ p: [c[0] + nrm[0] * rr, c[1], c[2] + nrm[2] * rr], right: cross([0, 1, 0], nrm), up: [0, 1, 0], g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: t0, lit: t0 });
+        }
+      };
+      return { P, dot, ring };
+    };
+    const scarf = col(PINK ? '#ff7fae' : '#d8404f', 1.3), ivory = col('#f6efe0', 0.95);
+
+    // 곰인형
+    {
+      const { P, dot, ring } = toy(1.35, 4.6), t0 = STAR_T + 1.6, fur = col('#c98a4b', 1.05), text = 'teddybear', gs = 0.2;
+      ball(P(0, 0, 0.62), 0.62, text, fur, gs, t0);                    // 몸
+      ball(P(0.05, 0, 1.46), 0.46, text, fur, gs, t0 + 0.2);            // 머리
+      for (const sd of [-1, 1]) {
+        ball(P(0, sd * 0.33, 1.87), 0.17, text, fur, gs, t0 + 0.4);     // 귀
+        ball(P(0.2, sd * 0.64, 0.82), 0.24, text, fur, gs, t0 + 0.1);   // 팔
+        ball(P(0.58, sd * 0.36, 0.27), 0.27, text, fur, gs, t0);        // 다리
+        dot(P(0.47, sd * 0.17, 1.58), '•', ivory, 0.3, t0 + 0.6);       // 눈
+      }
+      ball(P(0.38, 0, 1.36), 0.2, 'o', ivory, 0.17, t0 + 0.4);          // 주둥이
+      dot(P(0.6, 0, 1.4), '•', scarf, 0.34, t0 + 0.6);                  // 코
+      ring(P(0.03, 0, 1.07), 0.47, '=', scarf, 0.3, t0 + 0.5);          // 목도리
+    }
+    // 눈사람
+    {
+      const { P, dot, ring } = toy(3.05, 4.65), t0 = STAR_T + 2.3, text = 'snow*', gs = 0.2;
+      ball(P(0, 0, 0.56), 0.58, text, ivory, gs, t0);
+      ball(P(0, 0, 1.36), 0.42, text, ivory, gs, t0 + 0.25);
+      ball(P(0, 0, 1.98), 0.3, text, ivory, gs, t0 + 0.5);
+      for (const sd of [-1, 1]) dot(P(0.3, sd * 0.11, 2.06), '•', col('#f0cd86', 1.3), 0.24, t0 + 0.8);
+      dot(P(0.36, 0, 1.97), '>', col('#ff9a4a', 1.4), 0.36, t0 + 0.8);  // 당근 코
+      ring(P(0, 0, 1.7), 0.34, '=', scarf, 0.28, t0 + 0.7);
+      for (const up of [1.2, 1.42]) dot(P(0.43, 0, up), '•', col('#f0cd86', 1.2), 0.2, t0 + 0.8);
+    }
+  }
+
+  // 공중에 떠다니는 글자: 편지 버전은 떠오르는 하트, 기본 버전은 내려오는 눈 결정
+  const floaters = [];
+  {
+    const c = PINK ? col('#ff8db3', 0.85) : col('#eaf2ee', 0.5), g = glyph(PINK ? '♥' : '❄', 'mono');
+    for (let i = 0; i < 46; i++) {
+      floaters.push({ p: [(grng() - 0.5) * 24, grng() * 17, -8 + grng() * 12], right: [1, 0, 0], up: [0, 1, 0], g, color: c, h: 0, size: 0.32 + grng() * 0.4, seed: grng(), reveal: MUSIC_START + grng() * 6, lit: 0 });
+    }
+  }
+
   // ── WebGL 장면 ────────────────────────────────────────────────────
   const glCv = $('gl');
   const renderer = new THREE.WebGLRenderer({ canvas: glCv, antialias: false, powerPreference: 'high-performance' });
@@ -576,7 +643,7 @@ print("메리 크리스마스,", you)`;
   const U = { uTime: { value: 0 }, uPx: { value: 1000 }, uBeat: { value: new THREE.Vector3() } };
   const additive = { transparent: true, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false };
 
-  function glyphMesh(list, flat) {
+  function glyphMesh(list, flat, drift = 0) {
     const geo = new THREE.InstancedBufferGeometry();
     const plane = new THREE.PlaneGeometry(1, 1);
     geo.index = plane.index;
@@ -594,15 +661,23 @@ print("메리 크리스마스,", you)`;
     geo.instanceCount = n;
     const mat = new THREE.ShaderMaterial({
       ...additive, side: THREE.DoubleSide,
-      uniforms: { uTime: U.uTime, uAtlas: { value: atlasTex }, uFlat: { value: flat ? 1 : 0 }, uGain: { value: 1 } },
+      uniforms: { uTime: U.uTime, uAtlas: { value: atlasTex }, uFlat: { value: flat ? 1 : 0 }, uDrift: { value: drift }, uGain: { value: 1 } },
       vertexShader: `
         attribute vec3 aPos, aRight, aUp, aColor; attribute vec2 aCell, aH; attribute vec4 aAnim;
-        uniform float uTime, uFlat;
+        uniform float uTime, uFlat, uDrift;
         varying vec2 vUv; varying vec3 vCol;
         void main() {
           float e = clamp((uTime - aAnim.x) / 0.7, 0.0, 1.0); e = 1.0 - pow(1.0 - e, 3.0);
           float lit = uFlat > 0.5 ? 1.0 : smoothstep(aAnim.y, aAnim.y + 0.6, uTime);
-          vec3 p = aPos + aUp * (1.0 - e) * 0.7 + (position.x * aRight + position.y * aUp) * aAnim.z * (0.35 + 0.65 * e);
+          vec3 base = aPos, R = aRight, Up = aUp; float fade = 1.0;
+          if (abs(uDrift) > 0.5) {                     // 떠다니는 글자: 오르내리며 살짝 흔들린다
+            base.y = mod(aPos.y + uDrift * uTime * (0.3 + aAnim.w * 0.4), 17.0) - 2.0;
+            base.x += sin(uTime * 0.5 + aAnim.w * 31.0) * 0.6;
+            float a = sin(uTime * 0.8 + aAnim.w * 17.0) * 0.5;
+            R = aRight * cos(a) + aUp * sin(a); Up = aUp * cos(a) - aRight * sin(a);
+            fade = smoothstep(-2.0, 0.5, base.y) * smoothstep(15.0, 11.0, base.y);
+          }
+          vec3 p = base + Up * (1.0 - e) * 0.7 + (position.x * R + position.y * Up) * aAnim.z * (0.35 + 0.65 * e);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
           vUv = vec2((aCell.x + uv.x) / ${GRID}.0, 1.0 - (aCell.y + 1.0 - uv.y) / ${GRID}.0);
           // 원통 음영: 카메라를 보는 면은 밝게, 옆으로 돌아간 면과 뒷면은 어둡게
@@ -613,7 +688,7 @@ print("메리 크리스마스,", you)`;
           vec3 dim = vec3(0.16, 0.24, 0.2) * aH.y;
           vec3 c = mix(dim, aColor * shimmer, lit);
           c += vec3(1.0, 0.8, 0.5) * 1.3 * (1.0 - uFlat) * exp(-max(uTime - aAnim.y, 0.0) * 2.2) * step(aAnim.y, uTime);
-          vCol = c * shade * e;
+          vCol = c * shade * e * fade;
         }`,
       fragmentShader: `
         uniform sampler2D uAtlas; uniform float uGain; varying vec2 vUv; varying vec3 vCol;
@@ -627,6 +702,7 @@ print("메리 크리스마스,", you)`;
   spin.add(treeMesh, garlandMesh, glyphMesh(extras));
   spin.position.y = TRUNK;                        // 기둥 높이만큼 트리를 들어 올린다
   floorSpin.add(floorMesh);
+  scene.add(glyphMesh(floaters, true, PINK ? 1 : -1));
   atlasTex.needsUpdate = true;
 
   // 점으로 그리는 것들(전구, 금가루, 눈)은 셰이더 조각만 다르다
@@ -638,9 +714,9 @@ print("메리 크리스마스,", you)`;
     geo.setAttribute('aS', new THREE.BufferAttribute(a, 4));
     geo.setAttribute('aC', new THREE.BufferAttribute(c, 3));
     const mat = new THREE.ShaderMaterial({
-      ...additive, uniforms: { uTime: U.uTime, uPx: U.uPx, uBeat: U.uBeat, uRun: { value: RUN }, uWave: { value: WAVE }, ...uniforms },
+      ...additive, uniforms: { uTime: U.uTime, uPx: U.uPx, uBeat: U.uBeat, uRun: { value: RUN }, uWave: { value: WAVE }, uA: { value: 0 }, uV: { value: new THREE.Vector3() }, ...uniforms },
       vertexShader: `
-        attribute vec4 aS; attribute vec3 aC; uniform float uTime, uPx, uRun, uWave; uniform vec3 uBeat;
+        attribute vec4 aS; attribute vec3 aC; uniform float uTime, uPx, uRun, uWave, uA; uniform vec3 uBeat, uV;
         varying vec3 vCol; varying float vSoft;
         void main() {
           vec3 p = position; float size = 0.1; float power = 1.0; vSoft = 0.0;
@@ -654,6 +730,12 @@ print("메리 크리스마스,", you)`;
         varying vec3 vCol; varying float vSoft;
         void main() {
           float d = length(gl_PointCoord - 0.5) * 2.0;
+          if (vSoft > 1.5) {                           // 유리구슬: 가장자리가 진하고 왼쪽 위에 하이라이트
+            float body = smoothstep(0.98, 0.86, d), rim = smoothstep(0.25, 0.95, d);
+            float hl = smoothstep(0.36, 0.0, length(gl_PointCoord - vec2(0.35, 0.33)) * 2.0);
+            gl_FragColor = vec4((vCol * (0.2 + 0.62 * rim) + vec3(1.0, 0.96, 0.88) * hl * min(1.0, dot(vCol, vec3(0.7)))) * body, 1.0);
+            return;
+          }
           float core = smoothstep(0.42, 0.0, d), halo = pow(max(0.0, 1.0 - d), 2.4);
           gl_FragColor = vec4(vCol * mix(core * 1.5 + halo * 0.55, halo, vSoft), 1.0);
         }`,
@@ -737,6 +819,128 @@ print("메리 크리스마스,", you)`;
   const star = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTex, ...additive, color: new THREE.Color(1.9, 1.6, 1.05) }));
   star.position.set(0, TRUNK + TH * TOP + 0.75, 0);
   scene.add(star);
+
+  // 유리구슬 오너먼트
+  const brng = mulberry32(2024);
+  const BALL_COLS = PINK ? [col('#ff7fae', 1.25), col('#f3c9a0', 1.2), col('#fff0f4', 1.0)] : [col('#c9344e', 1.3), col('#e9c47a', 1.2), col('#f6efe0', 1.0)];
+  spin.add(pointsMesh(34, (i, pos, a, c) => {
+    const hf = (1 - Math.sqrt(1 - brng() * 0.97)) * 0.86 + 0.03, th = brng() * Math.PI * 2, r = prof(hf) * 1.06;
+    pos.set([Math.cos(th) * r, hf * TH, Math.sin(th) * r], i * 3);
+    a.set([RUN + WAVE * hf, 0.5 - hf * 0.16, brng(), 0], i * 4);
+    c.set(BALL_COLS[i % 3], i * 3);
+  }, `
+    float on = smoothstep(aS.x, aS.x + 0.5, uTime);
+    float facing = normalize(normalMatrix * vec3(position.x, 0.0, position.z)).z;
+    power = on * (0.8 + 0.2 * sin(uTime * 0.9 + aS.z * 30.0)) * (0.12 + 0.88 * smoothstep(-0.3, 0.45, facing));
+    size = aS.y; vSoft = 2.0;`));
+
+  // 별이 켜지는 순간 터지는 금빛 불꽃
+  const STAR_POS = new THREE.Vector3(0, TRUNK + TH * TOP + 0.75, 0);
+  scene.add(pointsMesh(180, (i, pos, a, c) => {
+    const y = brng() * 2 - 1, rr = Math.sqrt(1 - y * y), th = brng() * Math.PI * 2;
+    a.set([Math.cos(th) * rr, y, Math.sin(th) * rr, 0.4 + brng() * 0.9], i * 4);
+    c.set(col(brng() < 0.7 ? '#f3cf8a' : '#fff1d6', 1.4), i * 3);
+  }, `
+    float age = uTime - uA, k = 1.0 - exp(-max(age, 0.0) * 1.5);
+    p = uV + aS.xyz * aS.w * k * 4.6 - vec3(0.0, max(age, 0.0) * max(age, 0.0) * 0.1, 0.0);
+    power = step(0.0, age) * exp(-max(age, 0.0) * 0.85) * 1.5;
+    size = 0.14;`, { uA: { value: STAR_T }, uV: { value: STAR_POS } }));
+
+  // 유성 두 줄기: 머리와 꼬리를 점으로 이어 그린다
+  scene.add(pointsMesh(48, (i, pos, a, c) => {
+    const m = i < 24 ? 0 : 1;
+    a.set([m ? 0.57 : 0.08, (i % 24) / 24, m ? 1 : -15, m ? 17.5 : 16], i * 4);
+    c.set(col('#fff4dc', 1.3), i * 3);
+  }, `
+    float u = mod(uTime + aS.x * 13.0, 13.0) / 1.2;
+    p = vec3(aS.z, aS.w, -12.0) + normalize(vec3(1.0, -0.42, 0.0)) * (u * 13.0 - aS.y * 2.8);
+    power = step(u, 1.0) * sin(min(u, 1.0) * 3.1416) * pow(1.0 - aS.y, 1.5) * step(uA, uTime);
+    size = 0.17 * (1.0 - aS.y * 0.7);`, { uA: { value: STAR_T } }));
+
+  // 달과 썰매. 썰매가 지나는 길은 JS와 셰이더가 같은 식을 쓴다
+  const MOON = new THREE.Vector3(-6.5, 12.4, -14);
+  const moonTex = (function () {
+    const s = document.createElement('canvas'); s.width = s.height = 256;
+    const g = s.getContext('2d'), r = g.createRadialGradient(118, 112, 10, 128, 128, 120);
+    r.addColorStop(0, '#fffaf0'); r.addColorStop(0.75, '#f3e6c8'); r.addColorStop(0.97, '#d9c9a4'); r.addColorStop(1, 'rgba(217,201,164,0)');
+    g.fillStyle = r; g.beginPath(); g.arc(128, 128, 122, 0, 6.2832); g.fill();
+    g.fillStyle = 'rgba(150,135,105,0.16)';                           // 달의 바다
+    for (const [x, y, rad] of [[96, 92, 26], [150, 80, 17], [160, 140, 30], [104, 158, 20], [128, 118, 12]]) { g.beginPath(); g.arc(x, y, rad, 0, 6.2832); g.fill(); }
+    const tx = new THREE.CanvasTexture(s); tx.colorSpace = THREE.SRGBColorSpace; return tx;
+  })();
+  const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTex, ...additive, color: new THREE.Color('#bfae86'), opacity: 0.22 }));
+  const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, ...additive, color: new THREE.Color(0.62, 0.6, 0.55) }));
+  moonHalo.scale.set(11, 11, 1); moon.scale.set(4.6, 4.6, 1);
+  moonHalo.renderOrder = -6; moon.renderOrder = -5;
+  scene.add(moonHalo, moon);
+
+  const sleighTex = (function () {
+    const s = document.createElement('canvas'); s.width = 640; s.height = 200;
+    const g = s.getContext('2d');
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    const shapes = (fill) => {                                         // fill(그리는 함수)을 받아 모든 조각을 그린다
+      const ell = (x, y, rx, ry, rot) => { g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, 6.2832); fill(); };
+      const line = (pts, w) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); fill(w); };
+      // 썰매와 산타
+      g.beginPath(); g.moveTo(58, 92); g.quadraticCurveTo(64, 130, 86, 130); g.lineTo(150, 130); g.quadraticCurveTo(172, 128, 174, 102); g.lineTo(150, 106); g.lineTo(98, 106); g.quadraticCurveTo(80, 102, 76, 84); g.closePath(); fill();
+      g.beginPath(); g.moveTo(54, 146); g.lineTo(166, 146); g.quadraticCurveTo(188, 146, 190, 126); fill(4);
+      line([88, 130, 88, 146], 3.5); line([142, 130, 142, 146], 3.5);
+      ell(90, 86, 19, 19, 0);                                          // 선물 자루
+      ell(120, 94, 17, 18, 0); ell(130, 71, 9, 9, 0);                  // 몸, 머리
+      g.beginPath(); g.moveTo(121, 68); g.lineTo(138, 63); g.lineTo(112, 48); g.closePath(); fill(); ell(110, 47, 4, 4, 0);   // 모자
+      line([136, 92, 258, 96], 1.6);                                   // 고삐
+      line([174, 110, 500, 102], 1.6);                                 // 끈
+      // 사슴 세 마리 (달리는 자세)
+      [[262, 108, 0], [372, 100, 1], [482, 106, 0]].forEach(([x, y, flip]) => {
+        const k = flip ? -1 : 1;
+        ell(x, y, 27, 11, -0.1);
+        g.beginPath(); g.moveTo(x + 16, y - 7); g.lineTo(x + 30, y - 28); g.lineTo(x + 38, y - 23); g.lineTo(x + 27, y + 3); g.closePath(); fill();
+        ell(x + 39, y - 28, 10, 6, 0.3);
+        line([x + 34, y - 33, x + 28, y - 50, x + 37, y - 46], 2.4); line([x + 30, y - 43, x + 22, y - 47], 2.4);
+        line([x + 19, y + 6, x + 35, y + 20 + 3 * k, x + 46, y + 15 + 3 * k], 4); line([x + 13, y + 8, x + 24, y + 30 - 4 * k], 4);
+        line([x - 19, y + 6, x - 35, y + 20 - 3 * k, x - 46, y + 13 - 3 * k], 4); line([x - 13, y + 8, x - 22, y + 30 + 4 * k], 4);
+        line([x - 26, y - 4, x - 32, y - 9], 3);
+      });
+    };
+    // 먼저 금빛 테두리를 그리고, 그 위에 어두운 몸을 채운다
+    g.strokeStyle = 'rgba(240,205,134,0.5)';
+    shapes((w) => { g.lineWidth = (w || 0) + 3.5; g.stroke(); });
+    g.fillStyle = g.strokeStyle = '#030807';
+    shapes((w) => { if (w) { g.lineWidth = w; g.stroke(); } else g.fill(); });
+    g.fillStyle = '#ff3b3b'; g.beginPath(); g.arc(532, 79, 4.2, 0, 6.2832); g.fill();   // 루돌프의 코
+    const tx = new THREE.CanvasTexture(s); tx.colorSpace = THREE.SRGBColorSpace; return tx;
+  })();
+  const sleigh = new THREE.Sprite(new THREE.SpriteMaterial({ map: sleighTex, transparent: true, depthTest: false, depthWrite: false }));
+  sleigh.scale.set(7.2, 2.25, 1); sleigh.renderOrder = 5;
+  scene.add(sleigh);
+  const SLEIGH = { start: MUSIC_START + 2.5, every: 26, dur: 11 };
+  const sleighPath = (u) => [MOON.x + (u - 0.5) * 34, MOON.y - 1.0 + (u - 0.5) * 3 + Math.sin(u * Math.PI) * 1.2];
+  const trail = pointsMesh(110, (i, pos, a, c) => {
+    a.set([brng(), (brng() - 0.5) * 0.7, brng(), 0], i * 4);
+    c.set(col(brng() < 0.75 ? '#f3cf8a' : '#fff1d6', 1.2), i * 3);
+  }, `
+    float uu = uA - aS.x * 0.1;
+    p = vec3(uV.x + (uu - 0.5) * 34.0 - 3.4, uV.y - 1.0 + (uu - 0.5) * 3.0 + sin(uu * 3.1416) * 1.2 + aS.y - aS.x * 0.7, uV.z + 0.4);
+    power = step(0.0, uA) * step(uA, 1.0) * pow(1.0 - aS.x, 1.6) * (0.4 + 0.6 * abs(sin(uTime * 5.0 + aS.z * 40.0)));
+    size = 0.1 + 0.1 * aS.z;`, { uA: { value: -1 }, uV: { value: MOON } });
+  scene.add(trail);
+
+  // 별 뒤에서 천천히 도는 빛살
+  const raysTex = (function () {
+    const s = document.createElement('canvas'); s.width = s.height = 256;
+    const g = s.getContext('2d');
+    g.translate(128, 128);
+    for (let i = 0; i < 16; i++) {
+      const len = i % 2 ? 78 : 124, grad = g.createLinearGradient(0, 0, len, 0);
+      grad.addColorStop(0, 'rgba(255,255,255,0.5)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grad; g.rotate((Math.PI * 2) / 16);
+      g.beginPath(); g.moveTo(0, -2.2); g.lineTo(len, 0); g.lineTo(0, 2.2); g.closePath(); g.fill();
+    }
+    return new THREE.CanvasTexture(s);
+  })();
+  const rays = new THREE.Sprite(new THREE.SpriteMaterial({ map: raysTex, ...additive, color: new THREE.Color('#f3cf8a') }));
+  rays.position.copy(STAR_POS); rays.scale.set(0, 0, 1);
+  scene.add(rays);
 
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
@@ -823,6 +1027,8 @@ print("메리 크리스마스,", you)`;
     const aspect = sw / sh, tanH = Math.tan((FOV * Math.PI) / 360);
     const shot = (b) => ({ dist: Math.max(14.6 / b.fh, 13.2 / (b.fw * aspect)) / (2 * tanH), cx: b.cx, cy: b.cy });
     CAM = { a: shot(tree), b: shot(tree2), sw, sh };
+    if (portrait) MOON.set(3.7, 10.4, -14); else MOON.set(-6.5, 12.4, -14);   // 달은 글과 겹치지 않는 하늘에 둔다
+    moon.position.copy(MOON); moonHalo.position.copy(MOON);
     camera.aspect = aspect;
     renderer.setPixelRatio(dpr); renderer.setSize(sw, sh, false);
     composer.setPixelRatio(dpr); composer.setSize(sw, sh);
@@ -983,6 +1189,17 @@ print("메리 크리스마스,", you)`;
     star.scale.set(ss, ss, 1);
     star.material.rotation = Math.sin(t * 0.4) * 0.08;
     bloom.strength = 0.5 + 0.2 * lit + 0.08 * bf * lit;
+    const rs = sa < 0 ? 0 : easeOutCubic(clamp(sa / 2)) * 7.5;
+    rays.scale.set(rs, rs, 1); rays.material.rotation = t * 0.07; rays.material.opacity = 0.3 + 0.12 * bf;
+    // 썰매: 일정한 간격으로 달 앞을 가로지른다
+    const su = t < SLEIGH.start ? -1 : ((t - SLEIGH.start) % SLEIGH.every) / SLEIGH.dur;
+    trail.material.uniforms.uA.value = su;
+    sleigh.visible = su >= 0 && su <= 1.15;
+    if (sleigh.visible) {
+      const [sx, sy] = sleighPath(su), [nx, ny] = sleighPath(su + 0.01);
+      sleigh.position.set(sx, sy + Math.sin(t * 2.2) * 0.1, MOON.z + 0.5);
+      sleigh.material.rotation = Math.atan2(ny - sy, nx - sx);
+    }
     composer.render();
 
     // 2D 겹
