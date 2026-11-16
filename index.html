@@ -559,7 +559,7 @@ print("메리 크리스마스,", you)`;
   }
 
   // 글자로 빚은 공: 곰인형과 눈사람, 오너먼트의 재료 (공 표면에 점을 고르게 뿌리고 점마다 글자 면을 세운다)
-  const bearGlyphs = [], snowmanGlyphs = [];
+  const bearGlyphs = [], snowmanGlyphs = [], cakeGlyphs = [], CANDLES = [[-0.26, 1.24, 0.1], [0.02, 1.24, -0.2], [0.27, 1.24, 0.12]];
   {
     let sink = extras;
     const ball = (c, rad, text, color, size, t0) => {
@@ -613,6 +613,42 @@ print("메리 크리스마스,", you)`;
       dot(P(0.36, 0, 1.97), '>', col('#ff9a4a', 1.4), 0.36, t0 + 0.8);  // 당근 코
       ring(P(0, 0, 1.7), 0.34, '=', scarf, 0.28, t0 + 0.7);
       for (const up of [1.2, 1.42]) dot(P(0.43, 0, up), '•', col('#f0cd86', 1.2), 0.2, t0 + 0.8);
+    }
+    // 케이크: 두 단의 원기둥. 옆면은 글자 띠를 층층이 두르고 윗면은 글자를 눕혀 동심원으로 깐다
+    {
+      sink = cakeGlyphs;
+      const t0 = STAR_T + 3.0, cream = col(PINK ? '#ffd9e4' : '#f8efdc', 0.95), icing = col(PINK ? '#ff7fae' : '#d8404f', 1.25), berry = col('#e8364f', 1.3), leaf = col('#3aa878', 1.2), gold = col('#f0cd86', 1.35);
+      const tier = (r, y0, y1, text, gs) => {
+        for (let y = y0 + gs * 0.5, k = 0; y < y1; y += gs * 0.92, k++) {
+          const n = Math.round((Math.PI * 2 * r) / (gs * 0.6));
+          for (let i = 0; i < n; i++) {
+            const a = -((i + k * 0.5) / n) * Math.PI * 2, nrm = [Math.cos(a), 0, Math.sin(a)], at = t0 + y * 0.5 + grng() * 0.2;
+            sink.push({ p: [nrm[0] * r, y, nrm[2] * r], right: cross([0, 1, 0], nrm), up: [0, 1, 0], g: glyph(text[(i + k) % text.length], 'mono'), color: cream, h: 0, size: gs, seed: grng(), reveal: at, lit: at });
+          }
+        }
+        for (let rr = r - gs * 0.3; rr > gs * 0.2; rr -= gs * 0.62) {          // 윗면
+          const n = Math.max(3, Math.round((Math.PI * 2 * rr) / (gs * 0.62)));
+          for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2 + rr * 3, at = t0 + y1 * 0.5 + grng() * 0.2;
+            sink.push({ p: [Math.cos(a) * rr, y1, Math.sin(a) * rr], right: [1, 0, 0], up: [0, 0, -1], g: glyph('o', 'mono'), color: cream, h: 0, size: gs, seed: grng(), reveal: at, lit: at });
+          }
+        }
+      };
+      ring([0, 0.05, 0], 1.05, '=', gold, 0.26, t0);                    // 접시
+      tier(0.86, 0.08, 0.66, 'cake', 0.2);
+      tier(0.54, 0.66, 1.12, 'merry', 0.19);
+      ring([0, 0.2, 0], 0.88, '~', icing, 0.3, t0 + 0.3);               // 장식 띠
+      ring([0, 0.62, 0], 0.88, 'o', cream.map((v) => v * 1.2), 0.24, t0 + 0.4);   // 흘러내린 크림
+      ring([0, 0.78, 0], 0.56, '~', icing, 0.27, t0 + 0.5);
+      ring([0, 1.09, 0], 0.56, 'o', cream.map((v) => v * 1.2), 0.22, t0 + 0.6);
+      for (let i = 0; i < 7; i++) {                                     // 아랫단 위의 딸기와 잎
+        const a = (i / 7) * Math.PI * 2 + 0.2, p = [Math.cos(a) * 0.71, 0.75, Math.sin(a) * 0.71];
+        ball(p, 0.095, 'o', berry, 0.12, t0 + 0.7);
+        dot([p[0], p[1] + 0.13, p[2]], '*', leaf, 0.2, t0 + 0.8);
+      }
+      CANDLES.forEach(([x, y, z], i) => {                               // 초
+        for (let k = 0; k < 4; k++) dot([x, 1.16 + k * 0.085, z], '|', i % 2 ? gold : icing, 0.24, t0 + 0.9 + k * 0.05);
+      });
     }
     // 오너먼트: 글자로 빚은 작은 공을 가지 끝에 단다
     {
@@ -721,7 +757,8 @@ print("메리 크리스마스,", you)`;
   // 곰인형과 눈사람은 도는 트리에서 떼어 앞쪽 양옆에 따로 세운다 (늘 얼굴이 보이게)
   const bearMesh = glyphMesh(bearGlyphs), snowmanMesh = glyphMesh(snowmanGlyphs);
   bearMesh.position.set(-4.75, 0, 3.0); snowmanMesh.position.set(4.75, 0, 3.0);
-  scene.add(bearMesh, snowmanMesh);
+  const cakeMesh = glyphMesh(cakeGlyphs);
+  scene.add(bearMesh, snowmanMesh, cakeMesh);
   spin.position.y = TRUNK;                        // 기둥 높이만큼 트리를 들어 올린다
   floorSpin.add(floorMesh);
   scene.add(glyphMesh(floaters, true, PINK ? 1 : -1));
@@ -819,6 +856,10 @@ print("메리 크리스마스,", you)`;
     return new THREE.CanvasTexture(s);
   }
   const softTex = radialTexture([[0, 1], [0.35, 0.45], [0.7, 0.1], [1, 0]]);
+  const flames = CANDLES.map(([x, y, z]) => {
+    const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTex, transparent: true, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, color: new THREE.Color(1.5, 0.95, 0.45) }));
+    f.position.set(x, y + 0.34, z); cakeMesh.add(f); return f;
+  });
   const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: softTex, ...additive, color: new THREE.Color(PINK ? '#5a2140' : '#1d5a43') }));
   aura.position.set(0, 5.6, -5); aura.scale.set(25, 25, 1);
   scene.add(aura);
@@ -1423,8 +1464,11 @@ print("메리 크리스마스,", you)`;
       }
     }
     // 곰인형과 눈사람은 트리와 함께 둘레를 돌되, 몸은 늘 앞을 향한다
-    const orbit = (m, a0, sway) => { const a = a0 + t * 0.2; m.position.set(Math.cos(a) * 5.6, 0, Math.sin(a) * 5.6); m.rotation.y = -Math.cos(a) * 0.3 + sway; };
-    orbit(bearMesh, 2.58, Math.sin(t * 0.7) * 0.12); orbit(snowmanMesh, 0.56, Math.sin(t * 0.55 + 1.3) * 0.1);
+    const orbit = (m, a0, sway) => { const a = a0 + t * 0.2; m.position.set(Math.cos(a) * (L.portrait ? 4.9 : 5.6), 0, Math.sin(a) * 5.6); m.rotation.y = -Math.cos(a) * 0.3 + sway; };
+    orbit(bearMesh, 2.58, Math.sin(t * 0.7) * 0.12); orbit(snowmanMesh, 4.674, Math.sin(t * 0.55 + 1.3) * 0.1); orbit(cakeMesh, 0.486, 0);
+    cakeMesh.rotation.y = 0;
+    const fk = easeOutCubic(clamp((t - STAR_T - 4.0) / 0.8));           // 촛불은 케이크가 다 나타난 뒤에 켜지고 저마다 흔들린다
+    flames.forEach((f, i) => { const s = fk * (0.3 + 0.07 * Math.sin(t * 9 + i * 2.1) + 0.04 * Math.sin(t * 23 + i)); f.scale.set(s * 0.75, s, 1); });
     composer.render();
 
     // 2D 겹
