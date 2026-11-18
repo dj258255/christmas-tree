@@ -575,7 +575,7 @@ print("메리 크리스마스,", you)`;
         const x = pos.getX(i), z = pos.getZ(i), l = Math.hypot(x, z), r = rT(pos.getY(i), Math.atan2(z, x)) * 0.92 * l;
         if (l > 1e-6) pos.setXYZ(i, (x / l) * r, pos.getY(i), (z / l) * r);
       }
-      trunkCores.push(tinted(g, light, 0.13, START + 0.3));
+      trunkCores.push(tinted(g, light, 0.1, RUN - 0.1));
     }
     // 선물 상자: 몸통, 살짝 더 큰 뚜껑, 십자로 두른 리본, 위에 묶은 매듭. 포장지 무늬는 상자마다 다른 글자로 찍는다
     const BC = PINK ? { r: '#ee6f9f', g: '#d04a80', i: '#f6e9da', y: '#f9a8c4' } : { r: '#d0405a', g: '#3aa878', i: '#f6e9da', y: '#e2b866' };
@@ -865,7 +865,7 @@ print("메리 크리스마스,", you)`;
   const coreMat = new THREE.ShaderMaterial({
     transparent: true, vertexColors: true, uniforms: { uTime: U.uTime },
     vertexShader: `attribute float aT; varying vec3 vC; varying float vT; void main() { vC = color; vT = aT; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform float uTime; varying vec3 vC; varying float vT; void main() { if (uTime < vT) discard; gl_FragColor = vec4(vC, 1.0); }`,
+    fragmentShader: `uniform float uTime; varying vec3 vC; varying float vT; void main() { float a = smoothstep(vT, vT + 0.5, uTime); if (a <= 0.0) discard; gl_FragColor = vec4(vC, a); }`,
   });
   const solid = (glyphs, geos, always) => {
     const g = new THREE.Group(), core = new THREE.Mesh(geos.length > 1 ? mergeGeometries(geos) : geos[0], coreMat), skin = glyphMesh(glyphs);
@@ -874,12 +874,12 @@ print("메리 크리스마스,", you)`;
     g.add(core, skin);
     return g;
   };
-  // 트리도 속을 채운다: 층진 옆모습을 돌려 만든 몸이 타이핑을 따라 아래에서부터 자란다
+  // 트리도 속을 채운다: 만들어지는 동안은 글자뿐이고, 불빛이 올라갈 때 층진 몸이 아래에서부터 채워진다
   {
     const pts = [new THREE.Vector2(0.001, 0)];
     for (let i = 0; i <= 300; i++) { const h = (i / 300) * TOP; pts.push(new THREE.Vector2(Math.max(0.01, prof(h) - 0.2), h * TH)); }
-    const g = tinted(new THREE.LatheGeometry(pts, 48), col(PINK ? '#c0507a' : '#2f8f5f'), 0.07), aT = g.attributes.aT, pos = g.attributes.position;
-    for (let i = 0; i < pos.count; i++) aT.setX(i, typedAt(Math.min(TOP, pos.getY(i) / TH)) + 0.5);
+    const g = tinted(new THREE.LatheGeometry(pts, 48), col(PINK ? '#c0507a' : '#2f8f5f'), 0.045), aT = g.attributes.aT, pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) aT.setX(i, RUN + WAVE * Math.min(TOP, pos.getY(i) / TH));
     const core = new THREE.Mesh(g, coreMat); core.renderOrder = -1; core.frustumCulled = false; spin.add(core);
     for (const m of [treeMesh, garlandMesh, floorMesh]) { m.material.depthTest = true; m.renderOrder = 1; }
   }
