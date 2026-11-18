@@ -454,6 +454,36 @@ print("메리 크리스마스,", you)`;
   const SLANT = Math.hypot(TH, TR), SLOPE = TR / TH;
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   const grng = mulberry32(31);
+  // Pretext 조판기: 글을 맡기면, 폭(글자 크기의 몇 배인지)을 받을 때마다 다음 한 줄을 끊어 글자와 줄 안 위치(0~1)를 돌려준다.
+  // 공, 띠, 상자 면, 줄기처럼 모양이 다른 곳도 "둘레나 변의 길이 = 줄 폭"으로 보고 모두 이것으로 글을 놓는다
+  const TYPESET = new Map();
+  const typeset = (text, font = 'mono') => {
+    const key = font + '\n' + text;
+    let T = TYPESET.get(key);
+    if (T) return T;
+    const prep = prepareWithSegments(text.repeat(Math.ceil(1500 / text.length)), font === 'italic' ? `italic 500 ${PX}px ${SERIF_EN}` : `500 ${PX}px ${MONO}`);
+    let cur;
+    T = (widthEm) => {
+      const wpx = Math.max(PX * 0.7, widthEm * PX);
+      let r = layoutNextLineRange(prep, wpx, cur);
+      if (!r) { cur = undefined; r = layoutNextLineRange(prep, wpx); }
+      if (!r) return [];
+      cur = r.end;
+      const line = materializeLineRange(prep, r), out = [];
+      let x = 0, xe = 0;
+      for (const ch of line.text) {
+        const g = glyph(ch, font), w = g.adv * PX;
+        if (x + w > wpx * 1.08 && out.length) break;
+        if (ch.trim()) { out.push({ g, x: x + w / 2 }); xe = x + w; }
+        x += w;
+      }
+      const total = Math.max(xe + PX * 0.3, wpx * 0.8);
+      for (const o of out) o.u = o.x / total;
+      return out;
+    };
+    TYPESET.set(key, T);
+    return T;
+  };
 
   function buildShell(rScale, sizeMul, bright) {
     const out = [];
@@ -497,21 +527,19 @@ print("메리 크리스마스,", you)`;
   {
     const gTurns = 4.5, h0 = 0.035, h1 = 0.9, gold = col('#f0cd86', 1.6);
     const rAt = (h) => TR * (1 - h) * 1.02 + 0.32;
-    let h = h0, th = 0.6, i = 0;
-    while (h < h1) {
-      const ch = GARLAND_TEXT[i++ % GARLAND_TEXT.length], g = glyph(ch, 'italic');
-      const size = 0.62 * (1 - 0.5 * h), w = g.adv * size * 1.08;
-      const r = rAt(h), dth = (gTurns * Math.PI * 2) / (h1 - h0);      // 높이 1당 도는 각
-      const perH = Math.hypot(r * dth, SLANT);                          // 높이 1당 나선 길이
-      const dh = w / perH, hm = h + dh / 2, tm = th - dth * (dh / 2), rm = rAt(hm);
-      if (ch.trim()) {
+    // 나선을 반 바퀴씩 나눠, 그 길이를 줄 폭으로 삼아 Pretext가 끊어 준 한 줄을 따라 놓는다
+    const TG = typeset(GARLAND_TEXT, 'italic'), dth = (gTurns * Math.PI * 2) / (h1 - h0), SEG = Math.round(gTurns * 2);
+    for (let q = 0; q < SEG; q++) {
+      const hA = h0 + ((h1 - h0) * q) / SEG, hB = h0 + ((h1 - h0) * (q + 1)) / SEG, mid = (hA + hB) / 2;
+      const len = Math.hypot(rAt(mid) * dth, SLANT) * (hB - hA);
+      for (const { g, u } of TG(len / (0.62 * (1 - 0.5 * mid) * 1.08))) {
+        const hm = hA + u * (hB - hA), tm = 0.6 - dth * (hm - h0), rm = rAt(hm), size = 0.62 * (1 - 0.5 * hm);
         const cs = Math.cos(tm), sn = Math.sin(tm);
         const tan = [sn * rm * dth - cs * TR, TH, -cs * rm * dth - sn * TR];
         const tl = Math.hypot(...tan), right = tan.map((v) => v / tl);
         const nl = Math.hypot(1, SLOPE), nrm = [cs / nl, SLOPE / nl, sn / nl];
         garland.push({ p: [cs * rm, hm * TH, sn * rm], right, up: cross(nrm, right), g, color: gold, h: hm, size, seed: grng(), reveal: RUN + WAVE * hm - 0.1, lit: RUN + WAVE * hm });
       }
-      h += dh; th -= dth * dh;
     }
   }
 
@@ -554,18 +582,18 @@ print("메리 크리스마스,", you)`;
         let root = 0; for (const a of ROOTS) root = Math.max(root, Math.pow(Math.max(0, Math.cos(th - a)), 6));
         return 0.42 + 0.08 * (1 - u) + Math.exp(-u * 11.0) * (0.08 + 0.34 * root) + 0.035 * groove(y, th) + 0.02 * Math.sin(th * 13 + y * 2);
       };
-      const light = col('#dba468', 1.25), dark = col('#8a5a30', 0.95), CREST = '|l!I|', FURROW = '():;';
+      const light = col('#dba468', 1.25), dark = col('#8a5a30', 0.95);
       const bark = (th, y, ch, color, size) => {
+        const gl = typeof ch === 'string' ? glyph(ch, 'mono') : ch;
         const cs = Math.cos(th), sn = Math.sin(th), r = rT(y, th), slope = (rT(y + 0.03, th) - rT(y - 0.03, th)) / 0.06;
         const nl = Math.hypot(1, slope), nrm = [cs / nl, -slope / nl, sn / nl], right = [sn, 0, -cs];
-        trunkGlyphs.push({ p: [cs * (r + 0.015), y, sn * (r + 0.015)], right, up: cross(nrm, right), g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: START + 0.3 + (y + TRUNK) * 0.6 + grng() * 0.3, lit: RUN });
+        trunkGlyphs.push({ p: [cs * (r + 0.015), y, sn * (r + 0.015)], right, up: cross(nrm, right), g: gl, color, h: 0, size, seed: grng(), reveal: START + 0.3 + (y + TRUNK) * 0.6 + grng() * 0.3, lit: RUN });
       };
-      for (let y = Y0 + 0.07; y < 0.32; y += 0.15) {
-        const n = Math.round((2 * Math.PI * rT(y, 0.9)) / 0.085);
-        for (let i = 0; i < n; i++) {
-          const th = (i / n) * Math.PI * 2 + y * 0.9, g = groove(y, th), k = Math.min(1, Math.max(0, 0.5 + 0.5 * g + (trng() - 0.5) * 0.3));
-          const set = g > 0 ? CREST : FURROW;
-          bark(th, y, set[Math.floor(trng() * set.length)], light.map((v, j) => dark[j] + (v - dark[j]) * k), 0.25);
+      const TBK = typeset('|l!I|):|(;|l|I!|:');      // 껍질 글: 줄기 둘레를 줄 폭으로 삼아 한 바퀴씩 조판한다
+      for (let y = Y0 + 0.06; y < 0.32; y += 0.125) {
+        for (const { g, u } of TBK((2 * Math.PI * rT(y, 0.9)) / 0.2)) {
+          const th = -u * Math.PI * 2 + y * 0.9, k = Math.min(1, Math.max(0, 0.5 + 0.5 * groove(y, th) + (trng() - 0.5) * 0.3));
+          bark(th, y, g, light.map((v, j) => dark[j] + (v - dark[j]) * k), 0.22);
         }
       }
       for (const [th, y] of [[1.1, -0.45], [3.6, -0.2], [5.0, -0.62]]) { bark(th, y, 'O', light, 0.3); bark(th, y, '@', dark, 0.2); }   // 옹이
@@ -579,7 +607,7 @@ print("메리 크리스마스,", you)`;
     }
     // 선물 상자: 몸통, 살짝 더 큰 뚜껑, 십자로 두른 리본, 위에 묶은 매듭. 포장지 무늬는 상자마다 다른 글자로 찍는다
     const BC = PINK ? { r: '#ee6f9f', g: '#d04a80', i: '#f6e9da', y: '#f9a8c4' } : { r: '#d0405a', g: '#3aa878', i: '#f6e9da', y: '#e2b866' };
-    const BOXES = [], bx = mulberry32(909), tones = [BC.r, BC.g, BC.i, BC.y, BC.r, BC.i, BC.g], PATTERNS = PINK ? ['♥', '+', '•', 'x', '~', 'o'] : ['+', '•', 'x', '/', '~', 'o'];
+    const BOXES = [], bx = mulberry32(909), tones = [BC.r, BC.g, BC.i, BC.y, BC.r, BC.i, BC.g], PATTERNS = PINK ? ['♥', '+', '•', 'x', '~', 'o'] : ['+', '•', 'x', '/', '~', 'o'], WORDS = PINK ? ['love', 'you', 'dear', 'xoxo', 'mine', 'kiss'] : ['gift', 'joy', 'noel', 'xmas', 'merry', 'star'];
     for (let k = 0; k < 7; k++) {                     // 안쪽 줄: 큰 상자. 그 위에 작은 상자를 얹고, 몇 개는 한 단 더 올린다
       const a = (k / 7) * Math.PI * 2 + 0.5 + (bx() - 0.5) * 0.2, r = 3.35 + bx() * 0.3, s = 1.05 + bx() * 0.4;
       BOXES.push([a, r, s, tones[k], 0]);
@@ -599,33 +627,41 @@ print("메리 크리스마스,", you)`;
       const mid = (N - 1) / 2, y0 = -TRUNK + lift, lidH = s * 0.24, cell = s / N, pat = PATTERNS[k % PATTERNS.length];
       const cx = Math.cos(ang) * rad, cz = Math.sin(ang) * rad, phi = ang + 0.5 + k * 1.7, t0 = STAR_T + 0.45 + ((((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2)) * 1.5 + lift * 0.35;
       const body = col(hex, 1.0), lid = col(hex, 1.3), rib = col(hex === BC.i || hex === BC.y ? BC.r : '#f3d28c', hex === BC.i || hex === BC.y ? 1.25 : 1.3);
-      const put = (p, r, up, ch, color, size, at) => boxGlyphs.push({ p, right: r, up, g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: at, lit: at });
-      // 면 하나: w×h 칸에 무늬를 찍고, 가운데 줄에는 리본을 두른다
-      const face = (c, nrm, up, w, h, cols, rows, base, ch, cross2) => {
-        const r = cross(up, nrm);                       // right × up = 바깥쪽 법선이 되게
-        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-          const a = ((i + 0.5) / cols - 0.5) * w, b = ((j + 0.5) / rows - 0.5) * h, ribbon = i === mid || (cross2 && j === mid), at = t0 + (c[1] - y0) * 0.4 + grng() * 0.25;
-          const p = [c[0] + r[0] * a + up[0] * b, c[1] + r[1] * a + up[1] * b, c[2] + r[2] * a + up[2] * b];
-          if (ribbon) { put(p, r, up, '#', rib, cell * 1.75, at); continue; }
-          if (ch !== pat || (i + j) % 2 === 0) put(p, r, up, ch, base, cell * (ch === pat ? 1.45 : 1.6), at);
-          else put(p, r, up, '·', base.map((v) => v * 0.7), cell * 1.3, at);      // 무늬 사이는 옅은 점으로 메운다
+      const put = (p, r, up, ch, color, size, at) => boxGlyphs.push({ p, right: r, up, g: typeof ch === 'string' ? glyph(ch, 'mono') : ch, color, h: 0, size, seed: grng(), reveal: at, lit: at });
+      // 면 하나: 줄마다 면의 폭을 줄 폭으로 삼아 Pretext로 포장지 글을 한 줄씩 놓고, 가운데에는 리본을 두른다
+      const wrap = `${WORDS[k % WORDS.length]} ${pat} `;
+      const face = (c, nrm, up, w, h, rows, base, text, cross2) => {
+        const r = cross(up, nrm), band = rows === 1, gsz = cell * (band ? 1.55 : 1.0), T = typeset(text);   // right × up = 바깥쪽 법선이 되게
+        const at3 = (a, b) => [c[0] + r[0] * a + up[0] * b, c[1] + r[1] * a + up[1] * b, c[2] + r[2] * a + up[2] * b];
+        const when = (b) => t0 + (c[1] + up[1] * b - y0) * 0.4 + grng() * 0.25;
+        const lines = band ? 1 : Math.max(2, Math.round(h / (gsz * 0.82)));
+        for (let j = 0; j < lines; j++) {               // 포장지 글: 위에서 아래로 한 줄씩
+          const b = (0.5 - (j + 0.5) / lines) * h;
+          if (cross2 && Math.abs(b) < cell * 0.75) continue;
+          for (const { g, u } of T(w / gsz)) { const a = (u - 0.5) * w; if (Math.abs(a) > cell * 0.75) put(at3(a, b), r, up, g, base, gsz, when(b)); }
         }
+        const TR = typeset('#'), rs = cell * 1.75;      // 리본: 세로 한 줄, 윗면에는 가로 한 줄을 더해 십자로
+        for (let j = 0; j < rows; j++) { const b = ((j + 0.5) / rows - 0.5) * h; put(at3(0, b), r, up, '#', rib, rs, when(b)); }
+        if (cross2) for (const { g, u } of TR(w / (rs * 0.6))) put(at3((u - 0.5) * w, 0), r, up, g, rib, rs, when(0));
       };
       const ax = [Math.cos(phi), 0, Math.sin(phi)], az = [-Math.sin(phi), 0, Math.cos(phi)], top = y0 + s;
       for (let q = 0; q < 4; q++) {
         const a = phi + (q * Math.PI) / 2, n = [Math.cos(a), 0, Math.sin(a)], bh = s - lidH, rows = Math.max(2, Math.round(bh / cell));
-        face([cx + (n[0] * s) / 2, y0 + bh / 2, cz + (n[2] * s) / 2], n, [0, 1, 0], s, bh, N, rows, body, pat, false);
-        face([cx + n[0] * s * 0.55, top - lidH / 2, cz + n[2] * s * 0.55], n, [0, 1, 0], s * 1.1, lidH, N, 1, lid, '=', false);   // 뚜껑 옆띠
+        face([cx + (n[0] * s) / 2, y0 + bh / 2, cz + (n[2] * s) / 2], n, [0, 1, 0], s, bh, rows, body, wrap, false);
+        face([cx + n[0] * s * 0.55, top - lidH / 2, cz + n[2] * s * 0.55], n, [0, 1, 0], s * 1.1, lidH, 1, lid, '=', false);   // 뚜껑 옆띠
       }
-      face([cx, top, cz], [0, 1, 0], ax, s * 1.1, s * 1.1, N, N, lid, pat, true);
+      face([cx, top, cz], [0, 1, 0], ax, s * 1.1, s * 1.1, N, lid, wrap, true);
       // 매듭: 양쪽 고리 둘과 가운데 매듭, 뚜껑 위로 늘어진 끝자락
       const bs = Math.max(0.085, s * 0.11), blob = (c, ra, rb, rc) => {
-        const n = Math.max(8, Math.round((12 * ra * rb) / (bs * bs * 0.4)));
-        for (let i = 0; i < n; i++) {
-          const y = 1 - (2 * (i + 0.5)) / n, rr = Math.sqrt(1 - y * y), th = i * 2.39996, u = [Math.cos(th) * rr, y, Math.sin(th) * rr];
-          const nx = u[0] / ra, ny = u[1] / rb, nz = u[2] / rc, nl = Math.hypot(nx, ny, nz), nrm = [(ax[0] * nx + az[0] * nz) / nl, ny / nl, (ax[2] * nx + az[2] * nz) / nl];
-          let r = cross([0, 1, 0], nrm); const rl = Math.hypot(r[0], r[1], r[2]); r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
-          put([c[0] + ax[0] * u[0] * ra + az[0] * u[2] * rc, c[1] + u[1] * rb, c[2] + ax[2] * u[0] * ra + az[2] * u[2] * rc], r, cross(nrm, r), 'o', rib, bs, t0 + s * 0.4 + 0.3 + grng() * 0.2);
+        const rowsB = Math.max(2, Math.round((Math.PI * rb) / (bs * 0.8))), TB = typeset('bow ');
+        for (let j = 0; j < rowsB; j++) {
+          const ph = ((j + 0.5) / rowsB) * Math.PI, y = Math.cos(ph), rr = Math.sin(ph);
+          for (const { g, u: f } of TB((Math.PI * rr * (ra + rc)) / bs)) {
+            const th = -f * Math.PI * 2 + j * 2.4, u = [Math.cos(th) * rr, y, Math.sin(th) * rr];
+            const nx = u[0] / ra, ny = u[1] / rb, nz = u[2] / rc, nl = Math.hypot(nx, ny, nz), nrm = [(ax[0] * nx + az[0] * nz) / nl, ny / nl, (ax[2] * nx + az[2] * nz) / nl];
+            let r = cross([0, 1, 0], nrm); const rl = Math.hypot(r[0], r[1], r[2]); r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
+            put([c[0] + ax[0] * u[0] * ra + az[0] * u[2] * rc, c[1] + u[1] * rb, c[2] + ax[2] * u[0] * ra + az[2] * u[2] * rc], r, cross(nrm, r), g, rib, bs, t0 + s * 0.4 + 0.3 + grng() * 0.2);
+          }
         }
         const g = new THREE.SphereGeometry(1, 10, 8);
         g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(c[0], c[1], c[2]), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -phi), new THREE.Vector3(ra * 0.9, rb * 0.9, rc * 0.9)));
@@ -649,15 +685,17 @@ print("메리 크리스마스,", you)`;
   {
     let sink = extras, cores = null;
     const ball = (c, rad, text, color, size, t0) => {
-      const n = Math.max(6, Math.round((4 * Math.PI * rad * rad) / Math.pow(size * 0.66, 2)));
-      for (let i = 0; i < n; i++) {
-        const y = 1 - (2 * (i + 0.5)) / n, rr = Math.sqrt(1 - y * y), a = i * 2.39996;
-        const nrm = [Math.cos(a) * rr, y, Math.sin(a) * rr];
-        let r = cross([0, 1, 0], nrm);
-        const rl = Math.hypot(r[0], r[1], r[2]);
-        r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
-        const at = t0 + (1 - y) * 0.25 + grng() * 0.2;
-        sink.push({ p: [c[0] + nrm[0] * rad, c[1] + nrm[1] * rad, c[2] + nrm[2] * rad], right: r, up: cross(nrm, r), g: glyph(text[i % text.length], 'mono'), color, h: 0, size, seed: grng(), reveal: at, lit: at });
+      const T = typeset(text + ' '), rows = Math.max(2, Math.round((Math.PI * rad) / (size * 0.8)));
+      for (let j = 0; j < rows; j++) {                  // 위도마다 그 둘레를 줄 폭으로 삼아 한 줄씩
+        const ph = ((j + 0.5) / rows) * Math.PI, y = Math.cos(ph), rr = Math.sin(ph);
+        for (const { g, u } of T((2 * Math.PI * rr * rad) / size)) {
+          const a = -u * Math.PI * 2 + j * 2.4, nrm = [Math.cos(a) * rr, y, Math.sin(a) * rr];
+          let r = cross([0, 1, 0], nrm);
+          const rl = Math.hypot(r[0], r[1], r[2]);
+          r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
+          const at = t0 + (1 - y) * 0.25 + grng() * 0.2;
+          sink.push({ p: [c[0] + nrm[0] * rad, c[1] + nrm[1] * rad, c[2] + nrm[2] * rad], right: r, up: cross(nrm, r), g, color, h: 0, size, seed: grng(), reveal: at, lit: at });
+        }
       }
       if (cores) { const g = new THREE.SphereGeometry(rad * 0.93, 14, 10); g.translate(c[0], c[1], c[2]); cores.push(tinted(g, color, 0.1, t0)); }
     };
@@ -665,10 +703,9 @@ print("메리 크리스마스,", you)`;
     const P = (fw, side, up) => [-side, up, fw];
     const dot = (pos, ch, color, size, t0) => sink.push({ p: pos, right: [1, 0, 0], up: [0, 1, 0], g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: t0, lit: t0 });
     const ring = (c, rr, ch, color, size, t0) => {
-      const n = Math.round((Math.PI * 2 * rr) / (size * 0.5));
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2, nrm = [Math.cos(a), 0, Math.sin(a)];
-        sink.push({ p: [c[0] + nrm[0] * rr, c[1], c[2] + nrm[2] * rr], right: cross([0, 1, 0], nrm), up: [0, 1, 0], g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: t0, lit: t0 });
+      for (const { g, u } of typeset(ch)((Math.PI * 2 * rr) / size)) {
+        const a = -u * Math.PI * 2, nrm = [Math.cos(a), 0, Math.sin(a)];
+        sink.push({ p: [c[0] + nrm[0] * rr, c[1], c[2] + nrm[2] * rr], right: cross([0, 1, 0], nrm), up: [0, 1, 0], g, color, h: 0, size, seed: grng(), reveal: t0, lit: t0 });
       }
     };
     const scarf = col(PINK ? '#ff7fae' : '#d8404f', 1.3), ivory = col('#f6efe0', 0.95);
@@ -676,7 +713,7 @@ print("메리 크리스마스,", you)`;
     // 곰인형
     {
       sink = bearGlyphs; cores = bearCores;
-      const t0 = STAR_T + 1.6, fur = col('#c98a4b', 1.05), text = 'teddybear', gs = 0.2;
+      const t0 = STAR_T + 1.6, fur = col('#c98a4b', 1.05), text = 'teddy bear', gs = 0.2;
       ball(P(0, 0, 0.62), 0.62, text, fur, gs, t0);                    // 몸
       ball(P(0.05, 0, 1.46), 0.46, text, fur, gs, t0 + 0.2);            // 머리
       for (const sd of [-1, 1]) {
@@ -692,7 +729,7 @@ print("메리 크리스마스,", you)`;
     // 눈사람
     {
       sink = snowmanGlyphs; cores = snowmanCores;
-      const t0 = STAR_T + 2.3, text = 'snow*', gs = 0.2;
+      const t0 = STAR_T + 2.3, text = 'snow man *', gs = 0.2;
       ball(P(0, 0, 0.56), 0.58, text, ivory, gs, t0);
       ball(P(0, 0, 1.36), 0.42, text, ivory, gs, t0 + 0.25);
       ball(P(0, 0, 1.98), 0.3, text, ivory, gs, t0 + 0.5);
@@ -706,18 +743,17 @@ print("메리 크리스마스,", you)`;
       sink = cakeGlyphs; cores = cakeCores;
       const t0 = STAR_T + 3.0, cream = col(PINK ? '#ffd9e4' : '#f8efdc', 0.95), icing = col(PINK ? '#ff7fae' : '#d8404f', 1.25), berry = col('#e8364f', 1.3), leaf = col('#3aa878', 1.2), gold = col('#f0cd86', 1.35);
       const tier = (r, y0, y1, text, gs) => {
+        const T = typeset(text), TO = typeset('o');
         for (let y = y0 + gs * 0.5, k = 0; y < y1; y += gs * 0.92, k++) {
-          const n = Math.round((Math.PI * 2 * r) / (gs * 0.6));
-          for (let i = 0; i < n; i++) {
-            const a = -((i + k * 0.5) / n) * Math.PI * 2, nrm = [Math.cos(a), 0, Math.sin(a)], at = t0 + y * 0.5 + grng() * 0.2;
-            sink.push({ p: [nrm[0] * r, y, nrm[2] * r], right: cross([0, 1, 0], nrm), up: [0, 1, 0], g: glyph(text[(i + k) % text.length], 'mono'), color: cream, h: 0, size: gs, seed: grng(), reveal: at, lit: at });
+          for (const { g, u } of T((Math.PI * 2 * r) / gs)) {
+            const a = -u * Math.PI * 2 - k * 0.5, nrm = [Math.cos(a), 0, Math.sin(a)], at = t0 + y * 0.5 + grng() * 0.2;
+            sink.push({ p: [nrm[0] * r, y, nrm[2] * r], right: cross([0, 1, 0], nrm), up: [0, 1, 0], g, color: cream, h: 0, size: gs, seed: grng(), reveal: at, lit: at });
           }
         }
         for (let rr = r - gs * 0.3; rr > gs * 0.2; rr -= gs * 0.62) {          // 윗면
-          const n = Math.max(3, Math.round((Math.PI * 2 * rr) / (gs * 0.62)));
-          for (let i = 0; i < n; i++) {
-            const a = (i / n) * Math.PI * 2 + rr * 3, at = t0 + y1 * 0.5 + grng() * 0.2;
-            sink.push({ p: [Math.cos(a) * rr, y1, Math.sin(a) * rr], right: [1, 0, 0], up: [0, 0, -1], g: glyph('o', 'mono'), color: cream, h: 0, size: gs, seed: grng(), reveal: at, lit: at });
+          for (const { g, u } of TO((Math.PI * 2 * rr) / gs)) {
+            const a = u * Math.PI * 2 + rr * 3, at = t0 + y1 * 0.5 + grng() * 0.2;
+            sink.push({ p: [Math.cos(a) * rr, y1, Math.sin(a) * rr], right: [1, 0, 0], up: [0, 0, -1], g, color: cream, h: 0, size: gs, seed: grng(), reveal: at, lit: at });
           }
         }
       };
@@ -762,7 +798,7 @@ print("메리 크리스마스,", you)`;
       const orng = mulberry32(2024);
       for (let i = 0; i < 26; i++) {
         const hf = (1 - Math.sqrt(1 - orng() * 0.97)) * 0.8 + 0.04, th = orng() * Math.PI * 2, r = prof(hf) + 0.2;
-        ball([Math.cos(th) * r, hf * TH - 0.05, Math.sin(th) * r], 0.26 - hf * 0.08, 'o*', cols[i % 3], 0.13, RUN + WAVE * hf - 0.1);
+        ball([Math.cos(th) * r, hf * TH - 0.05, Math.sin(th) * r], 0.26 - hf * 0.08, 'noel * joy *', cols[i % 3], 0.13, RUN + WAVE * hf - 0.1);
       }
     }
   }
@@ -861,11 +897,11 @@ print("메리 크리스마스,", you)`;
   spin.add(treeMesh, garlandMesh, glyphMesh(extras));
   // 곰인형과 눈사람은 도는 트리에서 떼어 앞쪽 양옆에 따로 세운다 (늘 얼굴이 보이게)
   // 속이 찬 모형: 어두운 몸이 깊이를 먼저 쓰고, 겉의 글자는 그 깊이에 가려진다
-  // 몸마다 나타나는 시각(aT)을 갖고, 그 전에는 그리지 않는다
+  // 화면에 그리는 것은 글자뿐이다. 이 몸은 색을 쓰지 않고 깊이만 남겨서, 모형 뒤쪽 글자가 앞 글자에 겹쳐 비치지 않게만 한다
   const coreMat = new THREE.ShaderMaterial({
-    transparent: true, vertexColors: true, uniforms: { uTime: U.uTime },
-    vertexShader: `attribute float aT; varying vec3 vC; varying float vT; void main() { vC = color; vT = aT; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform float uTime; varying vec3 vC; varying float vT; void main() { float a = smoothstep(vT, vT + 0.5, uTime); if (a <= 0.0) discard; gl_FragColor = vec4(vC, a); }`,
+    colorWrite: false, uniforms: { uTime: U.uTime },
+    vertexShader: `attribute float aT; varying float vT; void main() { vT = aT; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uTime; varying float vT; void main() { if (uTime < vT) discard; gl_FragColor = vec4(0.0); }`,
   });
   const solid = (glyphs, geos, always) => {
     const g = new THREE.Group(), core = new THREE.Mesh(geos.length > 1 ? mergeGeometries(geos) : geos[0], coreMat), skin = glyphMesh(glyphs);
@@ -874,15 +910,7 @@ print("메리 크리스마스,", you)`;
     g.add(core, skin);
     return g;
   };
-  // 트리도 속을 채운다: 만들어지는 동안은 글자뿐이고, 불빛이 올라갈 때 층진 몸이 아래에서부터 채워진다
-  {
-    const pts = [new THREE.Vector2(0.001, 0)];
-    for (let i = 0; i <= 300; i++) { const h = (i / 300) * TOP; pts.push(new THREE.Vector2(Math.max(0.01, prof(h) - 0.2), h * TH)); }
-    const g = tinted(new THREE.LatheGeometry(pts, 48), col(PINK ? '#c0507a' : '#2f8f5f'), 0.045), aT = g.attributes.aT, pos = g.attributes.position;
-    for (let i = 0; i < pos.count; i++) aT.setX(i, RUN + WAVE * Math.min(TOP, pos.getY(i) / TH));
-    const core = new THREE.Mesh(g, coreMat); core.renderOrder = -1; core.frustumCulled = false; spin.add(core);
-    for (const m of [treeMesh, garlandMesh, floorMesh]) { m.material.depthTest = true; m.renderOrder = 1; }
-  }
+  for (const m of [treeMesh, garlandMesh, floorMesh]) { m.material.depthTest = true; m.renderOrder = 1; }   // 트리는 끝까지 글자뿐. 앞에 놓인 상자와 인형 뒤로만 가려진다
   spin.add(solid(trunkGlyphs, trunkCores), solid(decoGlyphs, decoCores));
   // 상자와 장난감은 트리가 완성된 뒤(별이 켜진 뒤)에 하나씩 튀어나온다
   const boxGroups = boxParts.map((b) => {
@@ -1190,35 +1218,38 @@ print("메리 크리스마스,", you)`;
       let r = cross([0, 1, 0], n);
       const rl = Math.hypot(r[0], r[1], r[2]);
       r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
-      glyphs.push({ p, right: r, up: cross(n, r), g: glyph(ch, 'mono'), color, h: 0, size: s, seed: grng(), reveal: 0, lit: 0 });
+      glyphs.push({ p, right: r, up: cross(n, r), g: typeof ch === 'string' ? glyph(ch, 'mono') : ch, color, h: 0, size: s, seed: grng(), reveal: 0, lit: 0 });
     };
     const ell = (c, rad, rot, text, color, s = size) => {            // 타원체 (z축 둘레로 rot만큼 기울임)
       const [a, b, d] = typeof rad === 'number' ? [rad, rad, rad] : rad, cs = Math.cos(rot), sn = Math.sin(rot);
-      const area = 4 * Math.PI * Math.pow((Math.pow(a * b, 1.6) + Math.pow(a * d, 1.6) + Math.pow(b * d, 1.6)) / 3, 1 / 1.6);
-      const n = Math.max(5, Math.round(area / Math.pow(s * 0.6, 2)));
-      for (let i = 0; i < n; i++) {
-        const y = 1 - (2 * (i + 0.5)) / n, rr = Math.sqrt(1 - y * y), th = i * 2.39996, u = [Math.cos(th) * rr, y, Math.sin(th) * rr];
-        const lx = u[0] * a * 1.05, ly = u[1] * b * 1.05, nx = u[0] / a, ny = u[1] / b, nz = u[2] / d, nl = Math.hypot(nx, ny, nz);
-        push([c[0] + lx * cs - ly * sn, c[1] + lx * sn + ly * cs, c[2] + u[2] * d * 1.05], [(nx * cs - ny * sn) / nl, (nx * sn + ny * cs) / nl, nz / nl], text[i % text.length], color, s);
+      const T = typeset(text), rows = Math.max(2, Math.round((Math.PI * b) / (s * 0.8)));
+      for (let j = 0; j < rows; j++) {
+        const ph = ((j + 0.5) / rows) * Math.PI, yy = Math.cos(ph), rr = Math.sin(ph);
+        for (const { g, u: f } of T((Math.PI * rr * (a + d)) / s)) {
+          const th = -f * Math.PI * 2 + j * 2.4, u = [Math.cos(th) * rr, yy, Math.sin(th) * rr];
+          const lx = u[0] * a * 1.05, ly = u[1] * b * 1.05, nx = u[0] / a, ny = u[1] / b, nz = u[2] / d, nl = Math.hypot(nx, ny, nz);
+          push([c[0] + lx * cs - ly * sn, c[1] + lx * sn + ly * cs, c[2] + u[2] * d * 1.05], [(nx * cs - ny * sn) / nl, (nx * sn + ny * cs) / nl, nz / nl], g, color, s);
+        }
       }
       const g = new THREE.SphereGeometry(1, 12, 8);
       g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(c[0], c[1], c[2]), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), rot), new THREE.Vector3(a, b, d)));
       occ.push(g);
     };
     const tube = (pts, r, text, color, s = size) => {                // 꺾은선을 따라가는 대롱. 아주 가늘면 글자 한 줄
-      let k = 0;
+      const T = typeset(text);
       for (let q = 0; q + 1 < pts.length; q++) {
         const A = pts[q], Bp = pts[q + 1], d = [Bp[0] - A[0], Bp[1] - A[1], Bp[2] - A[2]], len = Math.hypot(d[0], d[1], d[2]), ax = d.map((v) => v / len);
         let e1 = cross(ax, [0, 0, 1]);
         const el = Math.hypot(e1[0], e1[1], e1[2]);
         e1 = el < 1e-3 ? [1, 0, 0] : e1.map((v) => v / el);
-        const e2 = cross(ax, e1), around = r < s * 0.3 ? 1 : Math.max(4, Math.round((Math.PI * 2 * r) / (s * 0.55))), steps = Math.max(1, Math.round(len / (s * (around === 1 ? 0.5 : 0.6))));
-        for (let i = 0; i < steps; i++) {
+        const e2 = cross(ax, e1), thin = r < s * 0.3, steps = Math.max(1, Math.round(len / (s * 0.6)));
+        if (thin) {                                     // 아주 가늘면 길이를 줄 폭으로 삼은 글 한 줄
+          for (const { g, u } of T(len / (s * 0.85))) push([A[0] + d[0] * u, A[1] + d[1] * u, A[2] + d[2] * u + r * 1.3], [0, 0, 1], g, color, s);
+        } else for (let i = 0; i < steps; i++) {         // 굵으면 둘레를 줄 폭으로 삼아 고리마다 한 줄
           const t = (i + 0.5) / steps, c = [A[0] + d[0] * t, A[1] + d[1] * t, A[2] + d[2] * t];
-          for (let j = 0; j < around; j++, k++) {
-            if (around === 1) { push([c[0], c[1], c[2] + r * 1.3], [0, 0, 1], text[k % text.length], color, s); continue; }
-            const an = (j / around) * Math.PI * 2 + i * 0.6, cn = Math.cos(an), sn = Math.sin(an), n = [e1[0] * cn + e2[0] * sn, e1[1] * cn + e2[1] * sn, e1[2] * cn + e2[2] * sn];
-            push([c[0] + n[0] * r * 1.08, c[1] + n[1] * r * 1.08, c[2] + n[2] * r * 1.08], n, text[k % text.length], color, s);
+          for (const { g, u } of T((Math.PI * 2 * r) / (s * 0.9))) {
+            const an = -u * Math.PI * 2 + i * 0.6, cn = Math.cos(an), sn = Math.sin(an), n = [e1[0] * cn + e2[0] * sn, e1[1] * cn + e2[1] * sn, e1[2] * cn + e2[2] * sn];
+            push([c[0] + n[0] * r * 1.08, c[1] + n[1] * r * 1.08, c[2] + n[2] * r * 1.08], n, g, color, s);
           }
         }
         const g = new THREE.CylinderGeometry(r, r, len + r, 6);
@@ -1418,11 +1449,11 @@ print("메리 크리스마스,", you)`;
     ui.width = Math.round(sw * dpr); ui.height = Math.round(sh * dpr);
     base = ui.width / W;
 
-    // 카메라: 트리 전체(높이 14.6, 폭 12.6)가 주어진 칸에 들어오는 거리로 물러난다
+    // 카메라: 트리 전체(높이 15.6, 폭 12.6)가 주어진 칸에 들어오는 거리로 물러난다
     const aspect = sw / sh, tanH = Math.tan((FOV * Math.PI) / 360);
-    const shot = (b) => ({ dist: Math.max(14.6 / b.fh, 13.2 / (b.fw * aspect)) / (2 * tanH), cx: b.cx, cy: b.cy });
+    const shot = (b) => ({ dist: Math.max(15.6 / b.fh, 13.2 / (b.fw * aspect)) / (2 * tanH), cx: b.cx, cy: b.cy });
     CAM = { a: shot(tree), b: shot(tree2), sw, sh };
-    if (portrait) { MOON.set(3.7, 10.4, -14); SLEIGH_C.set(3.7, 10.4, -14); } else { MOON.set(8.2, 11.7, -14); SLEIGH_C.set(-1, 11.7, -14); }
+    if (portrait) { MOON.set(3.7, 10.9, -14); SLEIGH_C.set(3.7, 10.9, -14); } else { MOON.set(8.2, 12.2, -14); SLEIGH_C.set(-1, 12.2, -14); }
     moonMesh.material.uniforms.uLit.value.x = portrait ? MOON_L.x : -MOON_L.x;   // 빛은 트리 쪽에서 온다   // 달은 글과 겹치지 않는 하늘에 둔다
     moonG.position.copy(MOON); moonHalo.position.copy(MOON);
     camera.aspect = aspect;
@@ -1433,8 +1464,8 @@ print("메리 크리스마스,", you)`;
   let CAM = null;
   function aimCamera(m) {
     const { a, b, sw, sh } = CAM, mix = (k) => a[k] + (b[k] - a[k]) * m, dist = mix('dist');
-    camera.position.set(0, 5.5 + Math.sin(PITCH) * dist, Math.cos(PITCH) * dist);
-    camera.lookAt(0, 5.5, 0);
+    camera.position.set(0, 6.0 + Math.sin(PITCH) * dist, Math.cos(PITCH) * dist);
+    camera.lookAt(0, 6.0, 0);
     camera.setViewOffset(sw, sh, -(mix('cx') - 0.5) * sw, -(mix('cy') - 0.5) * sh, sw, sh);   // 트리를 화면 한쪽으로 옮긴다
   }
   const letterHeight = () => 110 + 44 + (TO ? 58 + LT.body.reduce((h, l) => h + (l ? 46 : 22), 0) + 64 : 54);
