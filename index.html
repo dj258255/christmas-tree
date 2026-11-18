@@ -193,29 +193,34 @@ print("메리 크리스마스,", you)`;
   const WAVE = 1.8;                               // 불빛이 밑에서 꼭대기까지 올라가는 시간
   const RUN = CMD_ENTER + 0.15, STAR_T = RUN + WAVE, MUSIC_START = RUN + WAVE + 0.9;
 
-  // 고요한 밤 (1818년 곡, 퍼블릭 도메인) 전곡 24마디. 끝나면 두 마디 쉬고 처음부터 되풀이한다
-  const BEAT = 0.56;
+  // We Wish You a Merry Christmas (영국 전래 캐럴, 퍼블릭 도메인). 3박자, 못갖춘마디로 시작한다.
+  // 1절 → 후렴(Good tidings we bring) → 1절, 모두 24마디. 끝나면 잠깐 쉬고 처음부터 되풀이한다
+  const BEAT = 0.4;
   const F = {
-    B3: 246.94, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0,
+    B3: 246.94, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, Fs4: 369.99, G4: 392.0, Gs4: 415.3, A4: 440.0,
     C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.0, B5: 987.77,
     C6: 1046.5, D6: 1174.66, E6: 1318.51, F6: 1396.91, G6: 1567.98, C7: 2093.0,
   };
   const notes = [];
   let TOTAL_BEATS = 0;
-  const PHRASE_A = [['G5', 1.5], ['A5', 0.5], ['G5', 1], ['E5', 3]];
-  const PHRASE_B = [['A5', 2], ['A5', 1], ['C6', 1.5], ['B5', 0.5], ['A5', 1], ['G5', 1.5], ['A5', 0.5], ['G5', 1], ['E5', 3]];
-  [...PHRASE_A, ...PHRASE_A,
-   ['D6', 2], ['D6', 1], ['B5', 3], ['C6', 2], ['C6', 1], ['G5', 3],
-   ...PHRASE_B, ...PHRASE_B,
-   ['D6', 2], ['D6', 1], ['F6', 1.5], ['D6', 0.5], ['B5', 1], ['C6', 3], ['E6', 3],
-   ['C6', 1.5], ['G5', 0.5], ['E5', 1], ['G5', 1.5], ['F5', 0.5], ['D5', 1], ['C5', 6]].forEach(([name, len]) => {
-    notes.push({ off: TOTAL_BEATS * BEAT, freq: F[name], beats: len });
+  const VERSE = [['G5', 1],
+    ['C6', 1], ['C6', 0.5], ['D6', 0.5], ['C6', 0.5], ['B5', 0.5], ['A5', 1], ['A5', 1], ['A5', 1],
+    ['D6', 1], ['D6', 0.5], ['E6', 0.5], ['D6', 0.5], ['C6', 0.5], ['B5', 1], ['G5', 1], ['G5', 1],
+    ['E6', 1], ['E6', 0.5], ['F6', 0.5], ['E6', 0.5], ['D6', 0.5], ['C6', 1], ['A5', 1], ['G5', 0.5], ['G5', 0.5],
+    ['A5', 1], ['D6', 1], ['B5', 1], ['C6', 2]];
+  const CHORUS = [['G5', 1],
+    ['C6', 1], ['C6', 1], ['C6', 1], ['B5', 2], ['B5', 1],
+    ['C6', 1], ['B5', 1], ['A5', 1], ['G5', 2], ['D6', 1],
+    ['E6', 1], ['D6', 1], ['C6', 1], ['G6', 1], ['G5', 1], ['G5', 0.5], ['G5', 0.5],
+    ['A5', 1], ['D6', 1], ['B5', 1], ['C6', 2]];
+  [VERSE, CHORUS, VERSE].forEach((part, sec) => part.forEach(([name, len]) => {
+    notes.push({ off: TOTAL_BEATS * BEAT, freq: F[name], beats: len, sec });
     TOTAL_BEATS += len;
-  });
-  const LOOP = (TOTAL_BEATS + 6) * BEAT;          // 한 바퀴 길이(초)
-  const CH = { C: [F.C4, F.E4, F.G4], G: [F.B3, F.D4, F.G4], G7: [F.B3, F.F4, F.G4], Fm: [F.C4, F.F4, F.A4] };
-  const CHORDS = [CH.C, CH.C, CH.C, CH.C, CH.G, CH.G, CH.C, CH.C, CH.Fm, CH.Fm, CH.C, CH.C, CH.Fm, CH.Fm, CH.C, CH.C,
-                  CH.G, CH.G7, CH.C, CH.C, CH.C, CH.G7, CH.C, null];
+  }));
+  const LOOP = (TOTAL_BEATS + 4) * BEAT;          // 한 바퀴 길이(초). 마지막 음 뒤에 한 마디 남짓 쉰다
+  const CH = { C: [F.C4, F.E4, F.G4], F: [F.C4, F.F4, F.A4], D7: [F.D4, F.Fs4, F.A4], G: [F.B3, F.D4, F.G4], E7: [F.B3, F.E4, F.Gs4], Am: [F.C4, F.E4, F.A4], G7: [F.B3, F.F4, F.G4] };
+  const VERSE_CH = [CH.C, CH.F, CH.D7, CH.G, CH.E7, CH.Am, CH.G7, CH.C];
+  const CHORDS = [...VERSE_CH, CH.C, CH.G, CH.Am, CH.G, CH.C, CH.C, CH.G7, CH.C, ...VERSE_CH.slice(0, 7), null];   // 마디마다 하나 (첫 박은 못갖춘마디 뒤)
 
   // ── 트리 치수 (3D 공간 단위) ───────────────────────────────────────
   const TH = 10, TR = 3.7, TIERS = 6, TOP = 0.94;
@@ -250,19 +255,24 @@ print("메리 크리스마스,", you)`;
   // 음악 한 바퀴 분량을 뒤에 붙인다. 다 쓰면 다음 바퀴를 또 붙여서 끝없이 이어진다
   function scheduleMusicLoop() {
     const t0 = MUSIC_START + loops++ * LOOP, batch = [];
-    for (const n of notes) {
-      const long = n.beats >= 2;
-      batch.push({ t: t0 + n.off, play: (w) => { sfx.bell(w, n.freq, 0.17, long ? 1.5 : 1.0, 0.06); sfx.bell(w, n.freq * 2, 0.035, long ? 0.9 : 0.6, -0.1); } });
+    for (const n of notes) {                       // 가락: 오르골 + 한 옥타브 위의 반짝임. 마지막 절은 더 밝게
+      const long = n.beats >= 2, top = n.sec === 2 ? 0.06 : 0.035;
+      batch.push({ t: t0 + n.off, play: (w) => { sfx.bell(w, n.freq, 0.16, long ? 1.4 : 0.8, 0.06); sfx.bell(w, n.freq * 2, top, long ? 0.9 : 0.5, -0.1); } });
     }
     CHORDS.forEach((ch, bar) => {
-      const b0 = t0 + bar * 3 * BEAT;
+      const b0 = t0 + (1 + bar * 3) * BEAT, sec = Math.floor(bar / 8);
       if (!ch) {                                   // 마지막 마디: 아래에서 위로 굴리는 으뜸화음
-        [F.C4, F.E4, F.G4, F.C5, F.E5, F.G5, F.C6].forEach((f, i) => batch.push({ t: b0 + i * 0.09, play: (w) => sfx.bell(w, f, 0.07, 1.9, (i - 3) * 0.15) }));
+        [F.C4, F.E4, F.G4, F.C5, F.E5, F.G5, F.C6].forEach((f, i) => batch.push({ t: b0 + i * 0.07, play: (w) => sfx.bell(w, f, 0.07, 1.9, (i - 3) * 0.15) }));
+        batch.push({ t: b0, play: (w) => sfx.jingle(w, 0.09) });
         return;
       }
-      [ch[0], ch[2], ch[1], ch[2], ch[1], ch[2]].forEach((f, i) => {
-        batch.push({ t: b0 + i * 0.5 * BEAT, play: (w) => sfx.bell(w, i === 0 ? f / 2 : f, i === 0 ? 0.085 : 0.04, 0.8, i % 2 ? 0.3 : -0.25) });
-      });
+      // 반주: 쿵-짝-짝. 첫 박은 낮은 밑음, 둘째와 셋째 박은 화음
+      batch.push({ t: b0, play: (w) => sfx.bell(w, ch[0] / 2, 0.11, 0.9, -0.2) });
+      for (const k of [1, 2]) batch.push({ t: b0 + k * BEAT, play: (w) => { sfx.bell(w, ch[1], 0.038, 0.45, 0.3); sfx.bell(w, ch[2], 0.038, 0.45, 0.35); } });
+      // 후렴부터는 높은 음역에서 화음을 굴려 반짝임을 더한다
+      if (sec >= 1) [ch[0], ch[1], ch[2], ch[1] * 2, ch[2], ch[1]].forEach((f, i) => batch.push({ t: b0 + i * 0.5 * BEAT, play: (w) => sfx.bell(w, f * 4, 0.014, 0.35, i % 2 ? -0.5 : 0.5) }));
+      // 썰매 방울: 1절은 마디 첫 박에만, 후렴부터는 박마다
+      for (let k = 0; k < 3; k++) if (k === 0 || sec >= 1) batch.push({ t: b0 + k * BEAT, play: (w) => sfx.jingle(w, k === 0 ? 0.075 : 0.04) });
     });
     batch.sort((a, b) => a.t - b.t);
     events = events.slice(evPtr).concat(batch);    // 이미 낸 소리는 버려서 목록이 불어나지 않게 한다
@@ -350,6 +360,26 @@ print("메리 크리스마스,", you)`;
           o.connect(g).connect(out); o.start(when); o.stop(when + dur + 0.05);
         }
       },
+      // 썰매 방울: 아주 짧은 고역 잡음에 어긋난 높은 음 몇 개를 얹는다
+      jingle(when, gain) {
+        if (!ac) return;
+        const out = panner(0.15);
+        out.connect(bellBus);
+        const src = ac.createBufferSource(); src.buffer = noise;
+        const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6500;
+        const g = ac.createGain();
+        g.gain.setValueAtTime(gain, when);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + 0.09);
+        src.connect(hp).connect(g).connect(out);
+        src.start(when, Math.random() * 1.5, 0.1);
+        for (const f of [3520, 4480, 5630]) {
+          const o = ac.createOscillator(); o.frequency.value = f * (0.99 + Math.random() * 0.02);
+          const og = ac.createGain();
+          og.gain.setValueAtTime(gain * 0.22, when);
+          og.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
+          o.connect(og).connect(out); o.start(when); o.stop(when + 0.18);
+        }
+      },
       // 점등 순간: 대역이 올라가는 부드러운 바람 소리
       whoosh(when, dur) {
         if (!ac) return;
@@ -382,7 +412,7 @@ print("메리 크리스마스,", you)`;
 
   // 글꼴이 내려온 뒤에 재야 조판이 맞는다. 쓰일 글자를 알려 줘서 필요한 조각만 받는다
   const GARLAND_TEXT = 'Merry Christmas · ';
-  const FLOOR_TEXT = 'Silent night · holy night · all is calm · all is bright · ';
+  const FLOOR_TEXT = 'We wish you a merry Christmas · and a happy new year · ';
   const allText = CODE + LETTER.join('') + TO + FROM + '에게드림';
   if (document.fonts && document.fonts.load) {
     await Promise.race([
@@ -1172,7 +1202,7 @@ print("메리 크리스마스,", you)`;
 
   // 달은 글자만으로 빚는다: 위도마다 그 둘레를 Pretext에 줄 폭으로 넘겨 가사를 한 바퀴씩 두르고,
   // 글자 면을 그 자리 땅의 기울기만큼 눕혀 크레이터의 비탈이 빛과 그늘로 드러나게 한다
-  const MOON_TEXT = 'Silent night, holy night, all is calm, all is bright, round yon virgin mother and child, holy infant so tender and mild, sleep in heavenly peace, sleep in heavenly peace. ';
+  const MOON_TEXT = 'We wish you a merry Christmas, we wish you a merry Christmas, we wish you a merry Christmas and a happy new year. Good tidings we bring to you and your kin, we wish you a merry Christmas and a happy new year. ';
   const moonGlyphs = [];
   {
     const size = 0.118, lh = size * 0.98, rows = Math.floor((Math.PI * MOON_R * 0.94) / lh), warm = col('#fff0cf'), cool = col('#cfd6e2');
