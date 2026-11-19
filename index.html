@@ -1190,7 +1190,7 @@ print("메리 크리스마스,", you)`;
   scene.add(auroraMesh);
 
   // 장난감 기차: 기관차와 화차 셋이 트리 둘레의 선로를 따라 반대 방향으로 돈다
-  const TRAIN_T = STAR_T + 3.6, TRAIN_RX = 7.3, TRAIN_RZ = 6.9, trainCars = [], trackGlyphs = [];
+  const TRAIN_T = STAR_T + 3.6, TRAIN_RX = 7.7, TRAIN_RZ = 7.45, TRAIN_PX = 6.5, trainCars = [], trackGlyphs = [];
   {
     const tie = col('#9a7650', 0.5), rail = col('#d9b871', 0.6);
     for (const [text, size, off, c] of [['I', 1.2, 0, tie], ['-', 0.42, -0.38, rail], ['-', 0.42, 0.38, rail]]) {   // 침목과 두 줄의 레일: 선로 둘레를 줄 폭으로
@@ -1792,7 +1792,7 @@ print("메리 크리스마스,", you)`;
     moonMesh.material.uniforms.uLit.value.x = portrait ? MOON_L.x : -MOON_L.x;   // 빛은 트리 쪽에서 온다   // 달은 글과 겹치지 않는 하늘에 둔다
     moonG.position.copy(MOON); moonHalo.position.copy(MOON);
     auroraMesh.position.set(portrait ? 24 : 0, portrait ? 7.6 : 0, 0);   // 세로 화면에서는 제목 뒤 하늘로 옮긴다
-    trackMesh.scale.x = portrait ? 6.3 / TRAIN_RX : 1;                    // 세로 화면에서는 선로를 좁힌다
+    trackMesh.scale.x = portrait ? TRAIN_PX / TRAIN_RX : 1;                    // 세로 화면에서는 선로를 좁힌다
     camera.aspect = aspect;
     renderer.setPixelRatio(dpr); renderer.setSize(sw, sh, false);
     composer.setPixelRatio(dpr); composer.setSize(sw, sh);
@@ -1980,7 +1980,7 @@ print("메리 크리스마스,", you)`;
     for (const [m, t0] of [[bearMesh, TOY_T.bear], [snowmanMesh, TOY_T.snowman], [cakeMesh, TOY_T.cake]]) { const u = pop(m, t0); m.position.y = Math.sin(u * Math.PI) * 0.55; }
     // 기차: 트리와 반대 방향으로 돈다. 칸마다 길을 따라 제 방향을 본다
     for (const cr of trainCars) {
-      const rx = L.portrait ? 6.3 : TRAIN_RX, a = 1.2 - t * 0.3 + cr.a, u = pop(cr.g, cr.at);
+      const rx = L.portrait ? TRAIN_PX : TRAIN_RX, a = 1.2 - t * 0.3 + cr.a, u = pop(cr.g, cr.at);
       cr.g.position.set(Math.cos(a) * rx, Math.sin(u * Math.PI) * 0.4 + Math.abs(Math.sin(t * 9 + cr.k * 1.7)) * 0.012, Math.sin(a) * TRAIN_RZ);
       cr.g.rotation.y = Math.atan2(Math.cos(a) * TRAIN_RZ, Math.sin(a) * rx);     // 타원 길의 접선 방향
     }
