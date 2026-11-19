@@ -576,22 +576,10 @@ print("메리 크리스마스,", you)`;
   // 바닥에 누운 글자 고리 (캐럴 가사)
   const floorGlyphs = [];
   [[5.3, 0.5, 0.75], [6.3, 0.4, 0.45]].forEach(([r, size, bright], k) => {
-    const c = col('#d9b871', bright);
-    let th = k * 1.3, i = 0;
-    const end = th - Math.PI * 2;
-    const count = Math.round((Math.PI * 2 * r) / (FLOOR_TEXT.length * 0.3 * size)) || 1;
-    const text = FLOOR_TEXT.repeat(count);
-    let total = 0;
-    for (const ch of text) total += glyph(ch, 'italic').adv * size;
-    const fit = (Math.PI * 2 * r) / total;                             // 고리가 딱 맞물리게 자간을 맞춘다
-    for (const ch of text) {
-      const g = glyph(ch, 'italic'), w = g.adv * size * fit, tm = th - w / 2 / r;
-      if (ch.trim()) {
-        const cs = Math.cos(tm), sn = Math.sin(tm);
-        floorGlyphs.push({ p: [cs * r, 0, sn * r], right: [sn, 0, -cs], up: [-cs, 0, -sn], g, color: c, h: 0, size, seed: grng(), reveal: STAR_T + 0.3 + k * 0.6 + (i / text.length) * 1.5, lit: 0 });
-      }
-      th -= w / r; i++;
-      if (th < end - 0.001) break;
+    const c = col('#d9b871', bright), T = typeset(FLOOR_TEXT, 'italic');
+    for (const { g, u } of T((Math.PI * 2 * r) / size)) {          // 고리 둘레를 줄 폭으로 삼은 한 줄
+      const tm = k * 1.3 - u * Math.PI * 2, cs = Math.cos(tm), sn = Math.sin(tm);
+      floorGlyphs.push({ p: [cs * r, 0, sn * r], right: [sn, 0, -cs], up: [-cs, 0, -sn], g, color: c, h: 0, size, seed: grng(), reveal: STAR_T + 0.3 + k * 0.6 + u * 1.5, lit: 0 });
     }
   });
 
@@ -835,6 +823,28 @@ print("메리 크리스마스,", you)`;
         ball(at(0.41 * K, -0.8 * K), 0.15 * K, 'o', cuff, gs * 1.15, t0 + 0.2);
       });
     }
+    // 종: 위는 좁고 아래로 벌어지는 고리를 층층이 쌓고, 안에 추를 단다
+    {
+      const gold = col('#f0cd86', 1.4), red = col(PINK ? '#ff7fae' : '#d8404f', 1.3), S = 0.36;
+      [[1.3, 0.2], [2.6, 0.37], [3.9, 0.1], [5.0, 0.47], [0.5, 0.31], [4.6, 0.24]].forEach(([th, hf]) => {
+        const r = prof(hf) + 0.42, cx = Math.cos(th) * r, cy = hf * TH - 0.05, cz = Math.sin(th) * r, t0 = RUN + WAVE * hf;
+        dot([cx, cy + 0.1, cz], '|', gold, 0.2, t0);
+        for (let v = 0; v <= 5; v++) ring([cx, cy - v * S * 0.19, cz], S * 0.5 * (0.24 + 0.76 * Math.pow(v / 5, 0.7)), 'bell', gold, 0.105, t0 + v * 0.03);
+        ring([cx, cy - S * 1.02, cz], S * 0.56, '=', gold.map((v) => v * 1.15), 0.12, t0 + 0.2);
+        ball([cx, cy - S * 1.2, cz], 0.055, 'o', red, 0.09, t0 + 0.25);
+        const g = new THREE.CylinderGeometry(S * 0.1, S * 0.48, S, 10); g.translate(cx, cy - S * 0.5, cz); decoCores.push(tinted(g, gold, 0.1, t0));
+      });
+      // 리본 매듭: 고리 둘과 가운데 매듭, 늘어진 끝자락 둘
+      [[1.9, 0.14], [3.1, 0.3], [4.2, 0.43], [5.8, 0.19], [0.0, 0.39]].forEach(([th, hf], i) => {
+        const r = prof(hf) + 0.4, c = [Math.cos(th) * r, hf * TH - 0.05, Math.sin(th) * r], d = [-Math.sin(th), 0, Math.cos(th)], t0 = RUN + WAVE * hf;
+        const tone = i % 2 ? gold : red;
+        for (const sd of [-1, 1]) {
+          ball([c[0] + d[0] * sd * 0.17, c[1], c[2] + d[2] * sd * 0.17], 0.14, 'bow', tone, 0.1, t0);
+          ball([c[0] + d[0] * sd * 0.1, c[1] - 0.24, c[2] + d[2] * sd * 0.1], 0.065, 'bow', tone, 0.09, t0 + 0.15);
+        }
+        ball(c, 0.075, 'o', i % 2 ? red : gold, 0.09, t0 + 0.1);
+      });
+    }
     // 지팡이 사탕: 곧은 대와 굽은 손잡이를 따라 작은 고리를 이어 붙인다. 고리마다 빨강과 흰색을 번갈아 칠한다
     {
       const red = col(PINK ? '#ff5f8f' : '#e0364f', 1.4), white = col('#fff4ea', 1.15), TC = typeset('candy cane '), R = 0.085, H = 0.85, HOOK = 0.2, gs = 0.125;
@@ -916,15 +926,19 @@ print("메리 크리스마스,", you)`;
     geo.instanceCount = n;
     const mat = new THREE.ShaderMaterial({
       ...additive, side: THREE.DoubleSide,
-      uniforms: { uTime: U.uTime, uAtlas: { value: atlasTex }, uFlat: { value: flat ? 1 : 0 }, uDrift: { value: drift }, uGain: { value: 1 }, uTw: { value: 0 }, uWrap: { value: 0 }, uLit: { value: new THREE.Vector4(0, 0, 1, 0) } },
+      uniforms: { uTime: U.uTime, uAtlas: { value: atlasTex }, uFlat: { value: flat ? 1 : 0 }, uDrift: { value: drift }, uGain: { value: 1 }, uTw: { value: 0 }, uWrap: { value: 0 }, uAur: { value: 0 }, uLit: { value: new THREE.Vector4(0, 0, 1, 0) } },
       vertexShader: `
         attribute vec3 aPos, aRight, aUp, aColor; attribute vec2 aCell, aH; attribute vec4 aAnim;
-        uniform float uTime, uFlat, uDrift, uTw, uWrap; uniform vec4 uLit;
+        uniform float uTime, uFlat, uDrift, uTw, uWrap, uAur; uniform vec4 uLit;
         varying vec2 vUv; varying vec3 vCol;
         void main() {
           float e = clamp((uTime - aAnim.x) / 0.7, 0.0, 1.0); e = 1.0 - pow(1.0 - e, 3.0);
           float lit = uFlat > 0.5 ? 1.0 : smoothstep(aAnim.y, aAnim.y + 0.6, uTime);
           vec3 base = aPos, R = aRight, Up = aUp; float fade = 1.0;
+          if (uAur > 0.5) {                            // 오로라: 장막처럼 천천히 일렁인다
+            base.x += sin(uTime * 0.17 + aPos.y * 0.35 + aPos.x * 0.05) * 0.5;
+            base.y += sin(uTime * 0.23 + aPos.x * 0.21) * 0.35;
+          }
           if (abs(uDrift) > 0.5) {                     // 떠다니는 글자: 오르내리며 살짝 흔들린다
             base.y = mod(aPos.y + uDrift * uTime * (0.3 + aAnim.w * 0.4), 17.0) - 2.0;
             base.x += sin(uTime * 0.5 + aAnim.w * 31.0) * 0.6;
@@ -951,6 +965,7 @@ print("메리 크리스마스,", you)`;
           vec3 c = mix(dim, aColor * shimmer, lit);
           c += vec3(1.0, 0.8, 0.5) * 1.3 * (1.0 - uFlat) * exp(-max(uTime - aAnim.y, 0.0) * 2.2) * step(aAnim.y, uTime);
           c *= mix(1.0, 0.25 + 0.75 * pow(0.5 + 0.5 * sin(uTime * (0.9 + aAnim.w * 2.2) + aAnim.w * 40.0), 2.0), uTw);   // 별의 깜박임
+          if (uAur > 0.5) c *= 0.25 + 0.75 * pow(0.5 + 0.5 * sin(aPos.x * 0.33 + uTime * 0.3 + sin(aPos.x * 0.11 - uTime * 0.13) * 2.2), 2.0);   // 밝은 띠가 옆으로 흘러간다
           vCol = c * shade * e * fade;
         }`,
       fragmentShader: `
@@ -999,42 +1014,129 @@ print("메리 크리스마스,", you)`;
   spin.position.y = TRUNK;                        // 기둥 높이만큼 트리를 들어 올린다
   floorSpin.add(floorMesh);
   scene.add(glyphMesh(floaters, true, PINK ? 1 : -1));
-  // 먼 마을: 트리 뒤 양옆에 눈 덮인 침엽수와 창에 불 켜진 집을 둔다. 줄마다 그 폭을 줄 폭으로 삼아 Pretext로 글을 놓는다
-  const farGlyphs = [];
+  // 글자로 덮은 상자와 공: 먼 마을과 장난감 기차의 재료. 면의 폭이나 위도의 둘레를 줄 폭으로 삼아 Pretext로 글을 놓는다
+  const plate = (list, c, right, up, w, h, text, color, gs, at, skip) => {      // 네모난 면 하나 (right × up = 바깥쪽 법선)
+    const T = typeset(text), rows = Math.max(1, Math.round(h / (gs * 0.85)));
+    for (let j = 0; j < rows; j++) {
+      const b = (0.5 - (j + 0.5) / rows) * h;
+      for (const { g, u } of T(w / gs)) {
+        const a = (u - 0.5) * w;
+        if (skip && skip(a, b)) continue;
+        list.push({ p: [c[0] + right[0] * a + up[0] * b, c[1] + right[1] * a + up[1] * b, c[2] + right[2] * a + up[2] * b], right, up, g, color, h: 0, size: gs, seed: grng(), reveal: at + grng() * 0.25, lit: at });
+      }
+    }
+  };
+  const slab = (list, cores, c, [w, h, d], rot, text, color, gs, at, skip) => {  // 상자: 옆면 넷과 윗면. rot은 y축 둘레로 돌린 각
+    const ax = [Math.cos(rot), 0, -Math.sin(rot)], az = [Math.sin(rot), 0, Math.cos(rot)], up = [0, 1, 0];
+    for (const [n, wf, off, id] of [[az, w, d / 2, 0], [az.map((v) => -v), w, d / 2, 1], [ax, d, w / 2, 2], [ax.map((v) => -v), d, w / 2, 3]]) {
+      plate(list, [c[0] + n[0] * off, c[1], c[2] + n[2] * off], cross(up, n), up, wf, h, text, color, gs, at, skip ? (a, b) => skip(id, a, b) : null);
+    }
+    plate(list, [c[0], c[1] + h / 2, c[2]], ax, az.map((v) => -v), w, d, text, color, gs, at);
+    if (cores) { const g = new THREE.BoxGeometry(w * 0.95, h * 0.95, d * 0.95); g.rotateY(rot); g.translate(c[0], c[1], c[2]); cores.push(tinted(g, color, 0.1, at)); }
+    return { ax, az };
+  };
+  const orb = (list, cores, c, [rx, ry, rz], text, color, gs, at, half) => {     // 공이나 타원체 (half면 위쪽 반만)
+    const T = typeset(text), rows = Math.max(2, Math.round(((half ? 0.5 : 1) * Math.PI * ry) / (gs * 0.8)));
+    for (let j = 0; j < rows; j++) {
+      const ph = ((j + 0.5) / rows) * Math.PI * (half ? 0.5 : 1), y = Math.cos(ph), rr = Math.sin(ph);
+      for (const { g, u } of T((Math.PI * rr * (rx + rz)) / gs)) {
+        const th = -u * Math.PI * 2 + j * 2.4, q = [Math.cos(th) * rr, y, Math.sin(th) * rr];
+        const n = [q[0] / rx, q[1] / ry, q[2] / rz], nl = Math.hypot(n[0], n[1], n[2]);
+        let r = cross([0, 1, 0], n);
+        const rl = Math.hypot(r[0], r[1], r[2]);
+        r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
+        list.push({ p: [c[0] + q[0] * rx, c[1] + q[1] * ry, c[2] + q[2] * rz], right: r, up: cross(n.map((v) => v / nl), r), g, color, h: 0, size: gs, seed: grng(), reveal: at + grng() * 0.25, lit: at });
+      }
+    }
+    if (cores) { const g = new THREE.SphereGeometry(0.93, 12, 8); g.scale(rx, ry, rz); g.translate(c[0], c[1], c[2]); cores.push(tinted(g, color, 0.1, at)); }
+  };
+  const speck = (list, p, right, up, ch, color, size, at) => list.push({ p, right, up, g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: at, lit: at });
+
+  // 먼 마을: 트리 뒤 양옆, 깊이를 달리해 세운 입체 침엽수와 집, 눈 언덕
+  const farGlyphs = [], farCores = [];
   {
-    const T0 = STAR_T + 1.4, frng = mulberry32(555);
-    const put = (x, y, z, g, color, size, at) => farGlyphs.push({ p: [x, y, z], right: [1, 0, 0], up: [0, 1, 0], g: typeof g === 'string' ? glyph(g, 'mono') : g, color, h: 0, size, seed: frng(), reveal: at, lit: 0 });
-    const green = col(PINK ? '#b85a80' : '#3a9a70', 0.5), snow = col('#dfe8f0', 0.6), wall = col('#b08a62', 0.42), warm = col('#ffd98a', 1.7);
-    const row = (T, x, y, z, w, gs, color, at, skip) => { for (const { g, u } of T(w / gs)) { const dx = (u - 0.5) * w; if (!skip || !skip(dx)) put(x + dx, y, z, g, color, gs, at + frng() * 0.3); } };
-    const pine = (x, z, h, at) => {                 // 층층이 넓어지는 삼각형. 층 끝마다 눈이 얹힌다
-      const gs = 0.135, rows = Math.round(h / (gs * 0.85)), TF = typeset('fir pine ');
+    const T0 = STAR_T + 1.4;
+    const green = col(PINK ? '#b85a80' : '#3a9a70', 0.62), snow = col('#dfe8f0', 0.7), wall = col('#b08a62', 0.55), warm = col('#ffd98a', 1.8);
+    const pine = (x, z, h, at) => {                 // 층진 원뿔: 층마다 그 둘레를 줄 폭으로. 층 끝에는 눈이 얹힌다
+      const gs = 0.14, rows = Math.round(h / (gs * 0.85)), TF = typeset('fir pine ');
       for (let j = 0; j < rows; j++) {
-        const f = (j + 1) / rows, tier = 0.7 + 0.3 * ((j % 6) / 5), w = Math.max(gs, f * h * 0.62 * tier), y = 0.45 + h - (j + 0.5) * gs * 0.85;
-        row(TF, x, y, z, w, gs, j % 6 === 5 || j === 0 ? snow : green, at + (1 - f) * 0.6);
+        const f = (j + 1) / rows, tier = 0.7 + 0.3 * ((j % 6) / 5), r = Math.max(0.03, f * h * 0.31 * tier), y = 0.45 + h - (j + 0.5) * gs * 0.85;
+        for (const { g, u } of TF((2 * Math.PI * r) / gs)) {
+          const th = -u * Math.PI * 2 + j * 2.4, cs = Math.cos(th), sn = Math.sin(th), nrm = [cs * 0.82, 0.57, sn * 0.82], right = [sn, 0, -cs];
+          farGlyphs.push({ p: [x + cs * r, y, z + sn * r], right, up: cross(nrm, right), g, color: j % 6 === 5 || j === 0 ? snow : green, h: 0, size: gs, seed: grng(), reveal: at + (1 - f) * 0.6 + grng() * 0.2, lit: at + (1 - f) * 0.6 });
+        }
       }
-      for (const y of [0.12, 0.3]) put(x, y, z, '|', wall, 0.24, at);
+      for (const y of [0.12, 0.3]) speck(farGlyphs, [x, y, z], [1, 0, 0], [0, 1, 0], '|', wall, 0.24, at);
+      const g = new THREE.ConeGeometry(h * 0.27, h, 12); g.translate(x, 0.45 + h / 2, z); farCores.push(tinted(g, green, 0.1, at));
     };
-    const house = (x, z, w, h, at) => {             // 벽, 눈 쌓인 지붕, 불 켜진 창, 굴뚝 연기
-      const gs = 0.13, rows = Math.round(h / (gs * 0.85)), TH_ = typeset('home sweet '), TS = typeset('snow ');
-      for (let j = 0; j < rows; j++) {
-        const y = 0.1 + (j + 0.5) * gs * 0.85, win = j >= rows * 0.35 && j <= rows * 0.7;
-        row(TH_, x, y, z, w, gs, wall, at + j * 0.05, win ? (dx) => Math.abs(Math.abs(dx) - w * 0.24) < gs * 0.75 : null);
+    const house = (x, z, w, d, h, rot, at) => {     // 벽 넷, 눈 쌓인 맞배지붕, 불 켜진 창, 굴뚝 연기
+      const gs = 0.13, rh = d * 0.6, c = [x, 0.1 + h / 2, z], up = [0, 1, 0];
+      const isWin = (id, a, b) => (id === 0 && Math.abs(Math.abs(a) - w * 0.24) < gs * 0.9 && Math.abs(b) < gs * 1.0) || (id === 2 && Math.abs(a) < gs * 0.9 && Math.abs(b) < gs * 1.0);
+      const { ax, az } = slab(farGlyphs, farCores, c, [w, h, d], rot, 'home sweet ', wall, gs, at, isWin);
+      for (const sd of [-1, 1]) speck(farGlyphs, [x + ax[0] * sd * w * 0.24 + az[0] * (d / 2 + 0.01), c[1], z + ax[2] * sd * w * 0.24 + az[2] * (d / 2 + 0.01)], ax, up, '■', warm, gs * 2.6, at + 0.5);
+      speck(farGlyphs, [x + ax[0] * (w / 2 + 0.01), c[1], z + ax[2] * (w / 2 + 0.01)], az.map((v) => -v), up, '■', warm, gs * 2.6, at + 0.6);
+      for (const sd of [1, -1]) {                   // 지붕의 두 경사면
+        const len = Math.hypot(rh, d / 2), upv = [(-az[0] * sd * d) / 2 / len, rh / len, (-az[2] * sd * d) / 2 / len], n = [(az[0] * sd * rh) / len, d / 2 / len, (az[2] * sd * rh) / len];
+        plate(farGlyphs, [x + (az[0] * sd * d) / 4, 0.1 + h + rh / 2, z + (az[2] * sd * d) / 4], cross(upv, n), upv, w * 1.16, len * 1.12, 'snow ', snow, gs, at + 0.4);
       }
-      for (const sd of [-1, 1]) put(x + sd * w * 0.24, 0.1 + h * 0.52, z + 0.01, '■', warm, gs * 2.6, at + 0.5);
-      const roofRows = Math.max(3, Math.round((w * 0.5) / (gs * 0.8)));
-      for (let j = 0; j < roofRows; j++) row(TS, x, 0.1 + h + (j + 0.5) * gs * 0.8, z, w * 1.25 * (1 - j / roofRows), gs, snow, at + 0.4 + j * 0.05);
-      for (let k = 0; k < 4; k++) put(x + w * 0.3 + Math.sin(k * 1.3) * 0.12, 0.1 + h + roofRows * gs * 0.8 * 0.5 + 0.25 + k * 0.24, z, '~', snow.map((v) => v * (0.7 - k * 0.13)), gs * 1.4, at + 0.9 + k * 0.12);
+      for (const sd of [1, -1]) {                   // 옆의 세모난 벽
+        const n = ax.map((v) => v * sd), r = cross(up, n), rows = Math.max(2, Math.round(rh / (gs * 0.85))), T = typeset('home sweet ');
+        for (let j = 0; j < rows; j++) {
+          const wj = d * (1 - (j + 0.5) / rows), y = 0.1 + h + (j + 0.5) * (rh / rows);
+          for (const { g, u } of T(wj / gs)) { const a = (u - 0.5) * wj; farGlyphs.push({ p: [x + n[0] * w / 2 + r[0] * a, y, z + n[2] * w / 2 + r[2] * a], right: r, up, g, color: wall, h: 0, size: gs, seed: grng(), reveal: at + 0.3, lit: at + 0.3 }); }
+        }
+      }
+      const gr = new THREE.BoxGeometry(w * 0.95, rh * 0.6, d * 0.6); gr.rotateY(rot); gr.translate(x, 0.1 + h + rh * 0.3, z); farCores.push(tinted(gr, snow, 0.1, at));
+      for (let k = 0; k < 4; k++) speck(farGlyphs, [x + ax[0] * w * 0.28 + Math.sin(k * 1.3) * 0.12, 0.1 + h + rh * 0.7 + 0.2 + k * 0.24, z + ax[2] * w * 0.28], [1, 0, 0], up, '~', snow.map((v) => v * (0.9 - k * 0.17)), gs * 1.5, at + 0.9 + k * 0.12);
     };
-    pine(-8.3, -9.0, 3.1, T0); pine(-5.3, -9.8, 2.3, T0 + 0.3); house(-6.9, -7.6, 1.8, 1.1, T0 + 0.5);
-    pine(5.4, -9.6, 2.5, T0 + 0.2); pine(9.0, -9.0, 3.3, T0 + 0.5); pine(10.6, -10.6, 2.4, T0 + 0.7); house(7.2, -7.9, 1.9, 1.2, T0 + 0.8);
-    const TD = typeset('snow · hush · ');           // 눈 쌓인 땅의 굽은 능선 두 줄
-    for (const [z, amp, ph] of [[-8.6, 0.22, 0.4], [-11.2, 0.4, 2.1]]) {
-      for (const { g, u } of TD(22 / 0.2)) { const x = -10.5 + u * 22; put(x, 0.12 + amp * (0.5 + 0.5 * Math.sin(x * 0.55 + ph)), z, g, snow.map((v) => v * 0.55), 0.2, T0 + 0.2 + u * 0.8); }
+    for (const [x, z, rx, ry, rz] of [[-7.6, -9.4, 3.4, 0.5, 1.9], [8.4, -9.8, 3.8, 0.55, 2.0], [0.5, -13, 5.2, 0.7, 2.2]]) orb(farGlyphs, farCores, [x, 0, z], [rx, ry, rz], 'snow · hush · ', snow.map((v) => v * 0.62), 0.2, T0 + 0.1, true);
+    pine(-8.7, -8.3, 3.2, T0); pine(-5.6, -10.6, 2.4, T0 + 0.3); pine(-10.8, -12.2, 2.9, T0 + 0.5); house(-7.0, -6.9, 1.9, 1.5, 1.1, 0.5, T0 + 0.5);
+    pine(5.6, -10.2, 2.6, T0 + 0.2); pine(9.3, -8.5, 3.4, T0 + 0.5); pine(11.2, -11.6, 2.5, T0 + 0.7); house(7.5, -7.3, 2.0, 1.6, 1.2, -0.45, T0 + 0.8);
+  }
+  const farMesh = solid(farGlyphs, farCores);
+  farMesh.children[1].material.uniforms.uWrap.value = 1;
+  scene.add(farMesh);
+
+  // 오로라: 하늘 높이 걸린 두 겹의 글자 장막. 아래는 밝은 초록, 위로 갈수록 보랏빛으로 흐려진다
+  const auroraGlyphs = [];
+  {
+    const lo = col(PINK ? '#ff9fc8' : '#6fffb0', 0.27), hi = col(PINK ? '#b88cff' : '#8f7bff', 0.08), TA = typeset('aurora · northern lights · ', 'italic'), size = 0.56;
+    for (const [x0, x1, z, yb, k] of [[-36, -7, -26, (x) => 11.4 + 1.4 * Math.sin(x * 0.16 + 0.5) + 0.6 * Math.sin(x * 0.41), 1], [-34, -12, -31, (x) => 14.6 + 1.0 * Math.sin(x * 0.2 + 2.0), 0.6]]) {
+      for (let row = 0; row < 7; row++) {
+        const f = row / 6, c = lo.map((v, i) => (v + (hi[i] - v) * f) * k);
+        for (const { g, u } of TA((x1 - x0) / size)) { const x = x0 + u * (x1 - x0); auroraGlyphs.push({ p: [x, yb(x) + row * 0.64, z], right: [1, 0, 0], up: [0, 1, 0], g, color: c, h: 0, size, seed: grng(), reveal: STAR_T + 2.0 + u * 2.5 + row * 0.1, lit: 0 }); }
+      }
     }
   }
-  const farMesh = glyphMesh(farGlyphs, true);
-  farMesh.material.depthTest = true; farMesh.renderOrder = 1;
-  scene.add(farMesh);
+  const auroraMesh = glyphMesh(auroraGlyphs, true);
+  auroraMesh.material.uniforms.uAur.value = 1; auroraMesh.renderOrder = -6;
+  scene.add(auroraMesh);
+
+  // 장난감 기차: 기관차와 화차 셋이 트리 둘레를 반대 방향으로 돈다. 칸마다 따로 묶어 굽은 길을 따라 놓는다
+  const TRAIN_T = STAR_T + 3.6, trainCars = [];
+  {
+    const red = col(PINK ? '#ff7fae' : '#d8404f', 1.3), green = col(PINK ? '#d04a80' : '#3aa878', 1.2), gold = col('#f0cd86', 1.4), ivory = col('#f6efe0', 1.0), warm = col('#ffe2a0', 1.9);
+    const X = [1, 0, 0], Y = [0, 1, 0], Z = [0, 0, 1], NX = [-1, 0, 0], NZ = [0, 0, -1], gs = 0.1;
+    const wheels = (G, xs, at) => { for (const x of xs) { speck(G, [x, 0.12, 0.2], X, Y, 'O', gold.map((v) => v * 0.7), 0.24, at); speck(G, [x, 0.12, -0.2], NX, Y, 'O', gold.map((v) => v * 0.7), 0.24, at); } };
+    const car = (k, build) => {
+      const G = [], C = [], at = TRAIN_T + k * 0.18;
+      build(G, C, at);
+      const inner = solid(G, C, true), outer = new THREE.Group();
+      inner.scale.setScalar(1.9); outer.add(inner); outer.visible = false; scene.add(outer);
+      trainCars.push({ g: outer, k, at });
+    };
+    car(0, (G, C, at) => {                           // 기관차: 보일러, 운전실, 굴뚝과 연기, 앞등
+      slab(G, C, [0.06, 0.3, 0], [0.62, 0.3, 0.32], 0, 'choo ', red, gs, at);
+      slab(G, C, [-0.33, 0.42, 0], [0.3, 0.54, 0.36], 0, 'toy ', green, gs, at);
+      for (const y of [0.52, 0.62]) speck(G, [0.24, y, 0], X, Y, '|', gold, 0.22, at);
+      for (let q = 0; q < 3; q++) speck(G, [0.2 - q * 0.1, 0.8 + q * 0.17, 0], X, Y, q ? 'o' : '°', ivory.map((v) => v * (0.8 - q * 0.2)), 0.16 + q * 0.06, at + 0.3 + q * 0.1);
+      speck(G, [0.38, 0.32, 0], NZ, Y, '•', warm, 0.34, at + 0.2);
+      wheels(G, [-0.3, -0.02, 0.26], at);
+    });
+    car(1, (G, C, at) => { slab(G, C, [0, 0.27, 0], [0.56, 0.24, 0.32], 0, 'merry ', green, gs, at); orb(G, C, [0, 0.55, 0], [0.16, 0.16, 0.16], 'star ', gold, 0.09, at + 0.1); wheels(G, [-0.17, 0.17], at); speck(G, [0.34, 0.2, 0], X, Y, '-', gold, 0.2, at); });
+    car(2, (G, C, at) => { slab(G, C, [0, 0.27, 0], [0.56, 0.24, 0.32], 0, 'xmas ', ivory, gs, at); slab(G, C, [0, 0.5, 0], [0.26, 0.22, 0.24], 0.3, 'gift ', red, 0.085, at + 0.1); speck(G, [0, 0.64, 0], X, Y, '#', gold, 0.16, at + 0.2); wheels(G, [-0.17, 0.17], at); speck(G, [0.34, 0.2, 0], X, Y, '-', gold, 0.2, at); });
+    car(3, (G, C, at) => { slab(G, C, [0, 0.27, 0], [0.56, 0.24, 0.32], 0, 'joy ', red, gs, at); for (const [x, c2] of [[-0.14, gold], [0.02, ivory], [0.17, green]]) orb(G, C, [x, 0.48, 0], [0.09, 0.09, 0.09], 'o ', c2, 0.08, at + 0.1); wheels(G, [-0.17, 0.17], at); speck(G, [0.34, 0.2, 0], X, Y, '-', gold, 0.2, at); });
+  }
   atlasTex.needsUpdate = true;
 
   // 점으로 그리는 것들(전구, 금가루, 눈)은 셰이더 조각만 다르다
@@ -1555,13 +1657,14 @@ print("메리 크리스마스,", you)`;
     ui.width = Math.round(sw * dpr); ui.height = Math.round(sh * dpr);
     base = ui.width / W;
 
-    // 카메라: 트리 전체(높이 15.6, 폭 12.6)가 주어진 칸에 들어오는 거리로 물러난다
+    // 카메라: 트리와 그 둘레를 도는 기차까지(높이 16.4, 폭 12.6)가 주어진 칸에 들어오는 거리로 물러난다
     const aspect = sw / sh, tanH = Math.tan((FOV * Math.PI) / 360);
-    const shot = (b) => ({ dist: Math.max(15.6 / b.fh, 13.2 / (b.fw * aspect)) / (2 * tanH), cx: b.cx, cy: b.cy });
+    const shot = (b) => ({ dist: Math.max(16.4 / b.fh, 13.2 / (b.fw * aspect)) / (2 * tanH), cx: b.cx, cy: b.cy });
     CAM = { a: shot(tree), b: shot(tree2), sw, sh };
     if (portrait) { MOON.set(3.7, 10.9, -14); SLEIGH_C.set(3.7, 10.9, -14); } else { MOON.set(8.2, 12.2, -14); SLEIGH_C.set(-1, 12.2, -14); }
     moonMesh.material.uniforms.uLit.value.x = portrait ? MOON_L.x : -MOON_L.x;   // 빛은 트리 쪽에서 온다   // 달은 글과 겹치지 않는 하늘에 둔다
     moonG.position.copy(MOON); moonHalo.position.copy(MOON);
+    auroraMesh.position.set(portrait ? 24 : 0, portrait ? 7.6 : 0, 0);   // 세로 화면에서는 제목 뒤 하늘로 옮긴다
     camera.aspect = aspect;
     renderer.setPixelRatio(dpr); renderer.setSize(sw, sh, false);
     composer.setPixelRatio(dpr); composer.setSize(sw, sh);
@@ -1570,8 +1673,8 @@ print("메리 크리스마스,", you)`;
   let CAM = null;
   function aimCamera(m) {
     const { a, b, sw, sh } = CAM, mix = (k) => a[k] + (b[k] - a[k]) * m, dist = mix('dist');
-    camera.position.set(0, 6.0 + Math.sin(PITCH) * dist, Math.cos(PITCH) * dist);
-    camera.lookAt(0, 6.0, 0);
+    camera.position.set(0, 5.6 + Math.sin(PITCH) * dist, Math.cos(PITCH) * dist);
+    camera.lookAt(0, 5.6, 0);
     camera.setViewOffset(sw, sh, -(mix('cx') - 0.5) * sw, -(mix('cy') - 0.5) * sh, sw, sh);   // 트리를 화면 한쪽으로 옮긴다
   }
   const letterHeight = () => 110 + 44 + (TO ? 58 + LT.body.reduce((h, l) => h + (l ? 46 : 22), 0) + 64 : 54);
@@ -1747,6 +1850,12 @@ print("메리 크리스마스,", you)`;
     const pop = (m, t0) => { const u = Math.min(1, (t - t0) / 0.75); m.visible = u > 0; if (u > 0) m.scale.setScalar(Math.max(0.001, 1 + 2.70158 * Math.pow(u - 1, 3) + 1.70158 * Math.pow(u - 1, 2))); return Math.max(0, u); };
     for (const m of boxGroups) { const u = pop(m, m.userData.t0); m.position.y = m.userData.pivot[1] + Math.pow(1 - u, 2) * 1.1; }
     for (const [m, t0] of [[bearMesh, TOY_T.bear], [snowmanMesh, TOY_T.snowman], [cakeMesh, TOY_T.cake]]) { const u = pop(m, t0); m.position.y = Math.sin(u * Math.PI) * 0.55; }
+    // 기차: 트리와 반대 방향으로 돈다. 칸마다 길을 따라 제 방향을 본다
+    for (const cr of trainCars) {
+      const a = 1.2 - t * 0.3 + cr.k * 0.2, u = pop(cr.g, cr.at);
+      cr.g.position.set(Math.cos(a) * (L.portrait ? 6.3 : 7.3), Math.sin(u * Math.PI) * 0.4 + Math.abs(Math.sin(t * 9 + cr.k * 1.7)) * 0.02, Math.sin(a) * 6.9);
+      cr.g.rotation.y = Math.PI / 2 - a;
+    }
     const fk = easeOutCubic(clamp((t - STAR_T - 4.0) / 0.8));           // 촛불은 케이크가 다 나타난 뒤에 켜지고 저마다 흔들린다
     flames.forEach((f, i) => { const s = fk * (0.3 + 0.07 * Math.sin(t * 9 + i * 2.1) + 0.04 * Math.sin(t * 23 + i)); f.scale.set(s * 0.75, s, 1); });
     composer.render();
