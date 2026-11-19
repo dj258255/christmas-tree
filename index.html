@@ -575,7 +575,7 @@ print("메리 크리스마스,", you)`;
 
   // 바닥에 누운 글자 고리 (캐럴 가사)
   const floorGlyphs = [];
-  [[5.3, 0.5, 0.75], [6.3, 0.4, 0.45]].forEach(([r, size, bright], k) => {
+  [[5.3, 0.5, 0.75], [6.05, 0.4, 0.45]].forEach(([r, size, bright], k) => {
     const c = col('#d9b871', bright), T = typeset(FLOOR_TEXT, 'italic');
     for (const { g, u } of T((Math.PI * 2 * r) / size)) {          // 고리 둘레를 줄 폭으로 삼은 한 줄
       const tm = k * 1.3 - u * Math.PI * 2, cs = Math.cos(tm), sn = Math.sin(tm);
@@ -1014,7 +1014,9 @@ print("메리 크리스마스,", you)`;
   spin.position.y = TRUNK;                        // 기둥 높이만큼 트리를 들어 올린다
   floorSpin.add(floorMesh);
   scene.add(glyphMesh(floaters, true, PINK ? 1 : -1));
-  // 글자로 덮은 상자와 공: 먼 마을과 장난감 기차의 재료. 면의 폭이나 위도의 둘레를 줄 폭으로 삼아 Pretext로 글을 놓는다
+  // 글자로 덮은 입체 부품: 먼 마을과 장난감 기차의 재료. 면의 폭이나 둘레를 줄 폭으로 삼아 Pretext로 글을 놓는다
+  const unitv = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const put = (list, p, right, up, g, color, size, at) => list.push({ p, right, up, g, color, h: 0, size, seed: grng(), reveal: at + grng() * 0.25, lit: at });
   const plate = (list, c, right, up, w, h, text, color, gs, at, skip) => {      // 네모난 면 하나 (right × up = 바깥쪽 법선)
     const T = typeset(text), rows = Math.max(1, Math.round(h / (gs * 0.85)));
     for (let j = 0; j < rows; j++) {
@@ -1022,7 +1024,7 @@ print("메리 크리스마스,", you)`;
       for (const { g, u } of T(w / gs)) {
         const a = (u - 0.5) * w;
         if (skip && skip(a, b)) continue;
-        list.push({ p: [c[0] + right[0] * a + up[0] * b, c[1] + right[1] * a + up[1] * b, c[2] + right[2] * a + up[2] * b], right, up, g, color, h: 0, size: gs, seed: grng(), reveal: at + grng() * 0.25, lit: at });
+        put(list, [c[0] + right[0] * a + up[0] * b, c[1] + right[1] * a + up[1] * b, c[2] + right[2] * a + up[2] * b], right, up, g, color, gs, at);
       }
     }
   };
@@ -1035,63 +1037,138 @@ print("메리 크리스마스,", you)`;
     if (cores) { const g = new THREE.BoxGeometry(w * 0.95, h * 0.95, d * 0.95); g.rotateY(rot); g.translate(c[0], c[1], c[2]); cores.push(tinted(g, color, 0.1, at)); }
     return { ax, az };
   };
-  const orb = (list, cores, c, [rx, ry, rz], text, color, gs, at, half) => {     // 공이나 타원체 (half면 위쪽 반만)
-    const T = typeset(text), rows = Math.max(2, Math.round(((half ? 0.5 : 1) * Math.PI * ry) / (gs * 0.8)));
+  const orb = (list, cores, c, [rx, ry, rz], text, color, gs, at) => {           // 공이나 타원체: 위도마다 그 둘레를 줄 폭으로
+    const T = typeset(text), rows = Math.max(2, Math.round((Math.PI * ry) / (gs * 0.8)));
     for (let j = 0; j < rows; j++) {
-      const ph = ((j + 0.5) / rows) * Math.PI * (half ? 0.5 : 1), y = Math.cos(ph), rr = Math.sin(ph);
+      const ph = ((j + 0.5) / rows) * Math.PI, y = Math.cos(ph), rr = Math.sin(ph);
       for (const { g, u } of T((Math.PI * rr * (rx + rz)) / gs)) {
         const th = -u * Math.PI * 2 + j * 2.4, q = [Math.cos(th) * rr, y, Math.sin(th) * rr];
-        const n = [q[0] / rx, q[1] / ry, q[2] / rz], nl = Math.hypot(n[0], n[1], n[2]);
+        const n = unitv([q[0] / rx, q[1] / ry, q[2] / rz]);
         let r = cross([0, 1, 0], n);
-        const rl = Math.hypot(r[0], r[1], r[2]);
-        r = rl < 1e-4 ? [1, 0, 0] : r.map((v) => v / rl);
-        list.push({ p: [c[0] + q[0] * rx, c[1] + q[1] * ry, c[2] + q[2] * rz], right: r, up: cross(n.map((v) => v / nl), r), g, color, h: 0, size: gs, seed: grng(), reveal: at + grng() * 0.25, lit: at });
+        r = Math.hypot(r[0], r[1], r[2]) < 1e-4 ? [1, 0, 0] : unitv(r);
+        put(list, [c[0] + q[0] * rx, c[1] + q[1] * ry, c[2] + q[2] * rz], r, cross(n, r), g, color, gs, at);
       }
     }
     if (cores) { const g = new THREE.SphereGeometry(0.93, 12, 8); g.scale(rx, ry, rz); g.translate(c[0], c[1], c[2]); cores.push(tinted(g, color, 0.1, at)); }
   };
+  const tubeY = (list, cores, c, r0, r1, len, text, color, gs, at) => {          // 세운 원통이나 원뿔대: c는 바닥 가운데, 반지름이 r0에서 r1로
+    const T = typeset(text), rows = Math.max(1, Math.round(len / (gs * 0.85)));
+    for (let j = 0; j < rows; j++) {
+      const sv = (j + 0.5) / rows, r = r0 + (r1 - r0) * sv;
+      for (const { g, u } of T((2 * Math.PI * r) / gs)) {
+        const th = -u * Math.PI * 2 + j * 2.4, cs = Math.cos(th), sn = Math.sin(th);
+        put(list, [c[0] + cs * r, c[1] + sv * len, c[2] + sn * r], [sn, 0, -cs], [0, 1, 0], g, color, gs, at);
+      }
+    }
+    if (cores) { const g = new THREE.CylinderGeometry(r1 * 0.88, r0 * 0.88, len, 10); g.translate(c[0], c[1] + len / 2, c[2]); cores.push(tinted(g, color, 0.1, at)); }
+  };
+  const barrelX = (list, cores, c, r, len, text, color, gs, at) => {             // 눕힌 원통(x축): 글줄이 축을 따라 달리고, 줄들이 둘레를 감싼다
+    const T = typeset(text), rows = Math.max(3, Math.round((2 * Math.PI * r) / (gs * 0.85)));
+    for (let j = 0; j < rows; j++) {
+      const ph = ((j + 0.5) / rows) * Math.PI * 2, n = [0, Math.cos(ph), Math.sin(ph)], right = [n[2] >= 0 ? 1 : -1, 0, 0], up = cross(n, right);
+      for (const { g, u } of T(len / gs)) put(list, [c[0] + (u - 0.5) * len * right[0], c[1] + n[1] * r, c[2] + n[2] * r], right, up, g, color, gs, at);
+    }
+    if (cores) { const g = new THREE.CylinderGeometry(r * 0.93, r * 0.93, len * 0.98, 12); g.rotateZ(Math.PI / 2); g.translate(c[0], c[1], c[2]); cores.push(tinted(g, color, 0.1, at)); }
+  };
+  const disc = (list, c, n, r, rings, text, color, gs, at) => {                  // 둥근 판: 법선 n을 보는 동심원 글줄 (바퀴, 보일러 앞판)
+    const T = typeset(text), e1 = unitv(cross([0, 1, 0], n)), e2 = cross(n, e1);
+    for (let i = 1; i <= rings; i++) {
+      const rr = (r * (i - 0.3)) / rings;
+      for (const { g, u } of T((2 * Math.PI * rr) / gs)) {
+        const th = -u * Math.PI * 2 + i, q = [0, 1, 2].map((k) => e1[k] * Math.cos(th) + e2[k] * Math.sin(th));
+        put(list, [c[0] + q[0] * rr, c[1] + q[1] * rr, c[2] + q[2] * rr], cross(q, n), q, g, color, gs, at);
+      }
+    }
+  };
   const speck = (list, p, right, up, ch, color, size, at) => list.push({ p, right, up, g: glyph(ch, 'mono'), color, h: 0, size, seed: grng(), reveal: at, lit: at });
+  // 연기: 글자 공 하나하나를 따로 띄워, 피어오르며 커지고 흐려지게 한다
+  const puffs = [];
+  const puff = (parent, b, d, rise, k, n, at, r, color) => {
+    const G = [];
+    orb(G, null, [0, 0, 0], [r, r * 0.85, r], 'puff·', color, r * 0.5, at);
+    const m = glyphMesh(G);
+    m.material.depthTest = true; m.renderOrder = 1; m.material.uniforms.uWrap.value = 1;
+    parent.add(m); puffs.push({ m, b, d, rise, ph: k / n });
+  };
 
-  // 먼 마을: 트리 뒤 양옆, 깊이를 달리해 세운 입체 침엽수와 집, 눈 언덕
+  // 먼 마을: 트리 뒤 양옆, 눈 언덕 위에 깊이를 달리해 세운 입체 침엽수와 집, 가로등
   const farGlyphs = [], farCores = [];
   {
     const T0 = STAR_T + 1.4;
-    const green = col(PINK ? '#b85a80' : '#3a9a70', 0.62), snow = col('#dfe8f0', 0.7), wall = col('#b08a62', 0.55), warm = col('#ffd98a', 1.8);
-    const pine = (x, z, h, at) => {                 // 층진 원뿔: 층마다 그 둘레를 줄 폭으로. 층 끝에는 눈이 얹힌다
-      const gs = 0.14, rows = Math.round(h / (gs * 0.85)), TF = typeset('fir pine ');
+    const green = col(PINK ? '#b85a80' : '#3a9a70', 0.66), snow = col('#dfe8f0', 0.72), wall = col('#b08a62', 0.58), warm = col('#ffd98a', 1.8);
+    const brick = col(PINK ? '#c0607a' : '#b5533c', 0.66), door = col(PINK ? '#ff7fae' : '#d8404f', 0.8), iron = col('#9a8a66', 0.55), starc = col('#f0cd86', 1.3);
+    const MOUNDS = [[-7.8, -9.3, 4.4, 0.42, 3.3], [8.6, -9.6, 4.6, 0.45, 3.4], [0.5, -13.6, 6.2, 0.6, 2.4]];
+    const ground = (x, z) => Math.max(0, ...MOUNDS.map(([cx, cz, rx, ry, rz]) => ry * Math.sqrt(Math.max(0, 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2))));
+    // 눈 언덕: 위에서 본 가로줄마다 그 현의 길이를 줄 폭으로. 가장자리로 갈수록 가팔라지므로 줄 간격을 표면 기울기에 맞춰 좁힌다
+    for (const [cx, cz, rx, ry, rz] of MOUNDS) {
+      const gs = 0.2, T = typeset('snow · hush · '), c = snow.map((v) => v * 0.6), at = T0 + 0.1;
+      for (let zz = -rz + 0.01; zz < rz; ) {
+        const k0 = Math.sqrt(Math.max(1e-4, 1 - (zz / rz) ** 2)), half = rx * k0, slope = (ry * Math.abs(zz)) / (rz * rz * k0);
+        if (half > gs) for (const { g, u } of T((2 * half) / gs)) {
+          const xx = (u - 0.5) * 2 * half, k = 1 - (xx / rx) ** 2 - (zz / rz) ** 2;
+          if (k <= 0.002) continue;
+          const y = ry * Math.sqrt(k), n = unitv([xx / (rx * rx), y / (ry * ry), zz / (rz * rz)]), right = unitv([1 - n[0] * n[0], -n[0] * n[1], -n[0] * n[2]]);
+          put(farGlyphs, [cx + xx, y, cz + zz], right, cross(n, right), g, c, gs, at + Math.abs(xx) * 0.08);
+        }
+        zz += Math.max(gs * 0.5, (gs * 0.9) / Math.hypot(1, slope));
+      }
+      const g = new THREE.SphereGeometry(0.95, 16, 10); g.scale(rx, ry, rz); g.translate(cx, 0, cz); farCores.push(tinted(g, c, 0.1, at));
+    }
+    const pine = (x, z, h, at) => {                 // 층진 침엽수: 다섯 줄이 한 층. 층마다 치마처럼 벌어지고 끝자락에 눈이 얹힌다
+      const y0 = ground(x, z) + 0.36, gs = 0.13, dy = gs * 0.8, rows = Math.round(h / dy), per = 5, TF = typeset('fir·pine·');
       for (let j = 0; j < rows; j++) {
-        const f = (j + 1) / rows, tier = 0.7 + 0.3 * ((j % 6) / 5), r = Math.max(0.03, f * h * 0.31 * tier), y = 0.45 + h - (j + 0.5) * gs * 0.85;
+        const f = (j + 0.6) / rows, k = j % per, r = Math.max(0.035, f * h * 0.3 * (0.58 + 0.42 * (k / (per - 1)))), y = y0 + h - (j + 0.5) * dy;
+        const c = k === per - 1 || j === 0 ? snow : green.map((v) => v * (0.72 + 0.28 * (k / (per - 1))));
         for (const { g, u } of TF((2 * Math.PI * r) / gs)) {
           const th = -u * Math.PI * 2 + j * 2.4, cs = Math.cos(th), sn = Math.sin(th), nrm = [cs * 0.82, 0.57, sn * 0.82], right = [sn, 0, -cs];
-          farGlyphs.push({ p: [x + cs * r, y, z + sn * r], right, up: cross(nrm, right), g, color: j % 6 === 5 || j === 0 ? snow : green, h: 0, size: gs, seed: grng(), reveal: at + (1 - f) * 0.6 + grng() * 0.2, lit: at + (1 - f) * 0.6 });
+          farGlyphs.push({ p: [x + cs * r, y, z + sn * r], right, up: cross(nrm, right), g, color: c, h: 0, size: gs, seed: grng(), reveal: at + (1 - f) * 0.6 + grng() * 0.2, lit: at + (1 - f) * 0.6 });
         }
       }
-      for (const y of [0.12, 0.3]) speck(farGlyphs, [x, y, z], [1, 0, 0], [0, 1, 0], '|', wall, 0.24, at);
-      const g = new THREE.ConeGeometry(h * 0.27, h, 12); g.translate(x, 0.45 + h / 2, z); farCores.push(tinted(g, green, 0.1, at));
+      const g = new THREE.ConeGeometry(h * 0.3 * 0.5, h, 12); g.translate(x, y0 + h / 2, z); farCores.push(tinted(g, green, 0.1, at));   // 속심은 가장 안쪽 줄보다 가늘게: 층 사이 글자를 가리지 않는다
+      tubeY(farGlyphs, farCores, [x, y0 - 0.4, z], 0.075, 0.065, 0.44, 'I', wall, 0.1, at);
+      speck(farGlyphs, [x, y0 + h + 0.1, z], [1, 0, 0], [0, 1, 0], '*', starc, 0.26, at + 0.7);
     };
-    const house = (x, z, w, d, h, rot, at) => {     // 벽 넷, 눈 쌓인 맞배지붕, 불 켜진 창, 굴뚝 연기
-      const gs = 0.13, rh = d * 0.6, c = [x, 0.1 + h / 2, z], up = [0, 1, 0];
-      const isWin = (id, a, b) => (id === 0 && Math.abs(Math.abs(a) - w * 0.24) < gs * 0.9 && Math.abs(b) < gs * 1.0) || (id === 2 && Math.abs(a) < gs * 0.9 && Math.abs(b) < gs * 1.0);
-      const { ax, az } = slab(farGlyphs, farCores, c, [w, h, d], rot, 'home sweet ', wall, gs, at, isWin);
-      for (const sd of [-1, 1]) speck(farGlyphs, [x + ax[0] * sd * w * 0.24 + az[0] * (d / 2 + 0.01), c[1], z + ax[2] * sd * w * 0.24 + az[2] * (d / 2 + 0.01)], ax, up, '■', warm, gs * 2.6, at + 0.5);
-      speck(farGlyphs, [x + ax[0] * (w / 2 + 0.01), c[1], z + ax[2] * (w / 2 + 0.01)], az.map((v) => -v), up, '■', warm, gs * 2.6, at + 0.6);
-      for (const sd of [1, -1]) {                   // 지붕의 두 경사면
+    const house = (x, z, w, d, h, rot, at) => {     // 벽 넷과 문, 불 켜진 창, 눈 쌓인 맞배지붕, 벽돌 굴뚝과 피어오르는 연기
+      const gs = 0.115, rh = d * 0.6, yb = ground(x, z) * 0.75, c = [x, yb + h / 2, z], up = [0, 1, 0];
+      const isWin = (id, a, b) => (id === 0 && Math.abs(Math.abs(a) - w * 0.3) < gs * 1.0 && Math.abs(b - h * 0.08) < gs * 1.1) || (id === 0 && Math.abs(a) < gs * 1.15 && b < h * 0.14) || (id >= 2 && Math.abs(a) < gs * 1.0 && Math.abs(b - h * 0.08) < gs * 1.1);
+      const { ax, az } = slab(farGlyphs, farCores, c, [w, h, d], rot, 'home·sweet·', wall, gs, at, isWin);
+      const front = (a, y, o) => [x + ax[0] * a + az[0] * (d / 2 + o), y, z + ax[2] * a + az[2] * (d / 2 + o)];
+      for (const sd of [-1, 1]) { speck(farGlyphs, front(sd * w * 0.3, c[1] + h * 0.08, 0.012), ax, up, '■', warm, gs * 2.7, at + 0.5); speck(farGlyphs, front(sd * w * 0.3, c[1] + h * 0.08 - gs * 1.5, 0.02), ax, up, '=', snow, gs * 1.6, at + 0.5); }
+      for (const sd of [-1, 1]) speck(farGlyphs, [x + ax[0] * sd * (w / 2 + 0.012), c[1] + h * 0.08, z + ax[2] * sd * (w / 2 + 0.012)], az.map((v) => -v * sd), up, '■', warm, gs * 2.7, at + 0.6);
+      plate(farGlyphs, front(0, yb + h * 0.32, 0.012), ax, up, gs * 2.3, h * 0.64, 'door·', door, gs * 0.72, at + 0.4);
+      speck(farGlyphs, front(gs * 0.75, yb + h * 0.3, 0.03), ax, up, '•', warm, gs * 0.9, at + 0.6);
+      speck(farGlyphs, front(0, yb + h * 0.74, 0.03), ax, up, 'o', green.map((v) => v * 1.6), gs * 1.5, at + 0.6);     // 문 위 리스
+      for (const sd of [1, -1]) {                   // 지붕의 두 경사면: 처마가 벽 밖으로 조금 나온다
         const len = Math.hypot(rh, d / 2), upv = [(-az[0] * sd * d) / 2 / len, rh / len, (-az[2] * sd * d) / 2 / len], n = [(az[0] * sd * rh) / len, d / 2 / len, (az[2] * sd * rh) / len];
-        plate(farGlyphs, [x + (az[0] * sd * d) / 4, 0.1 + h + rh / 2, z + (az[2] * sd * d) / 4], cross(upv, n), upv, w * 1.16, len * 1.12, 'snow ', snow, gs, at + 0.4);
+        const mid = [x + (az[0] * sd * d) / 4 - upv[0] * len * 0.07, yb + h + rh / 2 - upv[1] * len * 0.07, z + (az[2] * sd * d) / 4 - upv[2] * len * 0.07];
+        plate(farGlyphs, mid, cross(upv, n), upv, w * 1.14, len * 1.14, 'snow·', snow, gs, at + 0.4);
       }
       for (const sd of [1, -1]) {                   // 옆의 세모난 벽
-        const n = ax.map((v) => v * sd), r = cross(up, n), rows = Math.max(2, Math.round(rh / (gs * 0.85))), T = typeset('home sweet ');
+        const n = ax.map((v) => v * sd), r = cross(up, n), rows = Math.max(2, Math.round(rh / (gs * 0.85))), T = typeset('home·sweet·');
         for (let j = 0; j < rows; j++) {
-          const wj = d * (1 - (j + 0.5) / rows), y = 0.1 + h + (j + 0.5) * (rh / rows);
-          for (const { g, u } of T(wj / gs)) { const a = (u - 0.5) * wj; farGlyphs.push({ p: [x + n[0] * w / 2 + r[0] * a, y, z + n[2] * w / 2 + r[2] * a], right: r, up, g, color: wall, h: 0, size: gs, seed: grng(), reveal: at + 0.3, lit: at + 0.3 }); }
+          const wj = d * (1 - (j + 0.5) / rows), y = yb + h + (j + 0.5) * (rh / rows);
+          for (const { g, u } of T(wj / gs)) { const a = (u - 0.5) * wj; put(farGlyphs, [x + (n[0] * w) / 2 + r[0] * a, y, z + (n[2] * w) / 2 + r[2] * a], r, up, g, wall, gs, at + 0.3); }
         }
       }
-      const gr = new THREE.BoxGeometry(w * 0.95, rh * 0.6, d * 0.6); gr.rotateY(rot); gr.translate(x, 0.1 + h + rh * 0.3, z); farCores.push(tinted(gr, snow, 0.1, at));
-      for (let k = 0; k < 4; k++) speck(farGlyphs, [x + ax[0] * w * 0.28 + Math.sin(k * 1.3) * 0.12, 0.1 + h + rh * 0.7 + 0.2 + k * 0.24, z + ax[2] * w * 0.28], [1, 0, 0], up, '~', snow.map((v) => v * (0.9 - k * 0.17)), gs * 1.5, at + 0.9 + k * 0.12);
+      // 지붕 속심: 세모기둥. 경사면 글자 바로 안쪽에 놓여 뒤쪽 글자만 가린다
+      const gr = new THREE.CylinderGeometry(1, 1, w * 1.08, 3, 1, false, Math.PI / 2);
+      gr.rotateZ(Math.PI / 2); gr.translate(0, 0.5, 0); gr.scale(1, (rh * 0.9) / 1.5, (d * 0.94) / 1.732); gr.rotateY(rot); gr.translate(x, yb + h, z);
+      farCores.push(tinted(gr, snow, 0.1, at));
+      // 굴뚝: 뒤쪽 경사면에서 용마루 위로 솟은 벽돌 기둥, 눈 모자, 연기 셋
+      const pc = [x + ax[0] * w * 0.27 - az[0] * d * 0.2, 0, z + ax[2] * w * 0.27 - az[2] * d * 0.2], cb = yb + h + rh * 0.45, ct = yb + h + rh + 0.24;
+      slab(farGlyphs, farCores, [pc[0], (cb + ct) / 2, pc[2]], [0.27, ct - cb, 0.25], rot, 'brick·', brick, 0.085, at + 0.5);
+      orb(farGlyphs, farCores, [pc[0], ct + 0.02, pc[2]], [0.18, 0.075, 0.17], 'snow·', snow, 0.08, at + 0.6);
+      for (let k = 0; k < 3; k++) puff(scene, [pc[0], ct + 0.12, pc[2]], [0.55, 0, 0.1], 1.25, k, 3, at + 1.0, 0.15, snow.map((v) => v * 0.75));
     };
-    for (const [x, z, rx, ry, rz] of [[-7.6, -9.4, 3.4, 0.5, 1.9], [8.4, -9.8, 3.8, 0.55, 2.0], [0.5, -13, 5.2, 0.7, 2.2]]) orb(farGlyphs, farCores, [x, 0, z], [rx, ry, rz], 'snow · hush · ', snow.map((v) => v * 0.62), 0.2, T0 + 0.1, true);
-    pine(-8.7, -8.3, 3.2, T0); pine(-5.6, -10.6, 2.4, T0 + 0.3); pine(-10.8, -12.2, 2.9, T0 + 0.5); house(-7.0, -6.9, 1.9, 1.5, 1.1, 0.5, T0 + 0.5);
-    pine(5.6, -10.2, 2.6, T0 + 0.2); pine(9.3, -8.5, 3.4, T0 + 0.5); pine(11.2, -11.6, 2.5, T0 + 0.7); house(7.5, -7.3, 2.0, 1.6, 1.2, -0.45, T0 + 0.8);
+    const lamp = (x, z, at) => {                    // 가로등: 가는 기둥 위의 따뜻한 등
+      const y0 = ground(x, z);
+      tubeY(farGlyphs, farCores, [x, y0, z], 0.045, 0.032, 1.25, 'I', iron, 0.09, at);
+      orb(farGlyphs, farCores, [x, y0 + 1.37, z], [0.11, 0.13, 0.11], 'o', warm.map((v) => v * 0.7), 0.09, at + 0.4);
+      speck(farGlyphs, [x, y0 + 1.37, z + 0.13], [1, 0, 0], [0, 1, 0], '•', warm, 0.36, at + 0.5);
+      speck(farGlyphs, [x, y0 + 1.54, z], [1, 0, 0], [0, 1, 0], '^', iron, 0.26, at + 0.4);
+    };
+    pine(-8.9, -8.3, 3.2, T0); pine(-5.5, -10.6, 2.5, T0 + 0.3); pine(-10.9, -11.4, 2.9, T0 + 0.5); house(-7.0, -6.9, 1.9, 1.5, 1.1, 0.5, T0 + 0.5); lamp(-5.3, -6.5, T0 + 0.9);
+    pine(5.5, -10.2, 2.6, T0 + 0.2); pine(9.5, -8.5, 3.4, T0 + 0.5); pine(11.4, -11.2, 2.6, T0 + 0.7); house(7.5, -7.3, 2.0, 1.6, 1.2, -0.45, T0 + 0.8); lamp(5.7, -6.8, T0 + 1.1);
   }
   const farMesh = solid(farGlyphs, farCores);
   farMesh.children[1].material.uniforms.uWrap.value = 1;
@@ -1112,30 +1189,80 @@ print("메리 크리스마스,", you)`;
   auroraMesh.material.uniforms.uAur.value = 1; auroraMesh.renderOrder = -6;
   scene.add(auroraMesh);
 
-  // 장난감 기차: 기관차와 화차 셋이 트리 둘레를 반대 방향으로 돈다. 칸마다 따로 묶어 굽은 길을 따라 놓는다
-  const TRAIN_T = STAR_T + 3.6, trainCars = [];
+  // 장난감 기차: 기관차와 화차 셋이 트리 둘레의 선로를 따라 반대 방향으로 돈다
+  const TRAIN_T = STAR_T + 3.6, TRAIN_RX = 7.3, TRAIN_RZ = 6.9, trainCars = [], trackGlyphs = [];
   {
-    const red = col(PINK ? '#ff7fae' : '#d8404f', 1.3), green = col(PINK ? '#d04a80' : '#3aa878', 1.2), gold = col('#f0cd86', 1.4), ivory = col('#f6efe0', 1.0), warm = col('#ffe2a0', 1.9);
-    const X = [1, 0, 0], Y = [0, 1, 0], Z = [0, 0, 1], NX = [-1, 0, 0], NZ = [0, 0, -1], gs = 0.1;
-    const wheels = (G, xs, at) => { for (const x of xs) { speck(G, [x, 0.12, 0.2], X, Y, 'O', gold.map((v) => v * 0.7), 0.24, at); speck(G, [x, 0.12, -0.2], NX, Y, 'O', gold.map((v) => v * 0.7), 0.24, at); } };
+    const tie = col('#9a7650', 0.5), rail = col('#d9b871', 0.6);
+    for (const [text, size, off, c] of [['I', 1.2, 0, tie], ['-', 0.42, -0.38, rail], ['-', 0.42, 0.38, rail]]) {   // 침목과 두 줄의 레일: 선로 둘레를 줄 폭으로
+      for (const { g, u } of typeset(text)((Math.PI * (TRAIN_RX + TRAIN_RZ + 2 * off)) / size)) {
+        const a = u * Math.PI * 2, q = [Math.cos(a), 0, Math.sin(a)];
+        trackGlyphs.push({ p: [q[0] * (TRAIN_RX + off), off ? 0.03 : 0.01, q[2] * (TRAIN_RZ + off)], right: cross(q, [0, 1, 0]), up: q, g, color: c, h: 0, size, seed: grng(), reveal: TRAIN_T - 1.2 + u * 1.2, lit: 0 });
+      }
+    }
+  }
+  const trackMesh = glyphMesh(trackGlyphs);
+  trackMesh.material.depthTest = true; trackMesh.renderOrder = 1;
+  scene.add(trackMesh);
+  {
+    const red = col(PINK ? '#ff7fae' : '#d8404f', 1.3), green = col(PINK ? '#d04a80' : '#3aa878', 1.2), gold = col('#f0cd86', 1.3), ivory = col('#f6efe0', 1.0), warm = col('#ffe2a0', 1.9);
+    const dim = gold.map((v) => v * 0.6), X = [1, 0, 0], Y = [0, 1, 0], NZ = [0, 0, -1];
+    const OFF = [0, 0.225, 0.41, 0.595];            // 칸 사이 각도: 기관차가 길어서 첫 간격이 넓다
+    const wheel = (G, C, x, r, at) => {             // 바퀴: 테를 두른 둥근 판과 바퀴통
+      for (const sd of [1, -1]) {
+        disc(G, [x, r, sd * 0.2], [0, 0, sd], r, 1, 'o', gold, r * 0.72, at);
+        speck(G, [x, r, sd * 0.2], [sd, 0, 0], Y, '+', dim, r * 1.1, at);
+        const g = new THREE.CylinderGeometry(r * 0.92, r * 0.92, 0.05, 12); g.rotateX(Math.PI / 2); g.translate(x, r, sd * 0.165); C.push(tinted(g, gold, 0.1, at));
+      }
+    };
     const car = (k, build) => {
       const G = [], C = [], at = TRAIN_T + k * 0.18;
-      build(G, C, at);
+      const after = build(G, C, at);
       const inner = solid(G, C, true), outer = new THREE.Group();
+      inner.children[1].material.uniforms.uWrap.value = 1;
       inner.scale.setScalar(1.9); outer.add(inner); outer.visible = false; scene.add(outer);
-      trainCars.push({ g: outer, k, at });
+      if (after) after(inner);
+      trainCars.push({ g: outer, a: OFF[k], k, at });
     };
-    car(0, (G, C, at) => {                           // 기관차: 보일러, 운전실, 굴뚝과 연기, 앞등
-      slab(G, C, [0.06, 0.3, 0], [0.62, 0.3, 0.32], 0, 'choo ', red, gs, at);
-      slab(G, C, [-0.33, 0.42, 0], [0.3, 0.54, 0.36], 0, 'toy ', green, gs, at);
-      for (const y of [0.52, 0.62]) speck(G, [0.24, y, 0], X, Y, '|', gold, 0.22, at);
-      for (let q = 0; q < 3; q++) speck(G, [0.2 - q * 0.1, 0.8 + q * 0.17, 0], X, Y, q ? 'o' : '°', ivory.map((v) => v * (0.8 - q * 0.2)), 0.16 + q * 0.06, at + 0.3 + q * 0.1);
-      speck(G, [0.38, 0.32, 0], NZ, Y, '•', warm, 0.34, at + 0.2);
-      wheels(G, [-0.3, -0.02, 0.26], at);
+    car(0, (G, C, at) => {                           // 기관차
+      slab(G, C, [0, 0.2, 0], [0.96, 0.06, 0.34], 0, '=', dim, 0.06, at);                       // 차대
+      barrelX(G, C, [0.14, 0.38, 0], 0.15, 0.56, 'choo·', red, 0.085, at);                      // 눕힌 원통 보일러
+      for (const x of [0.0, 0.3]) barrelX(G, null, [x, 0.38, 0], 0.158, 0.05, '|', gold, 0.075, at + 0.1);   // 보일러 띠
+      disc(G, [0.425, 0.38, 0], X, 0.15, 2, 'o', gold, 0.07, at);                               // 앞판
+      speck(G, [0.44, 0.38, 0], NZ, Y, '•', warm, 0.3, at + 0.2);                               // 앞등
+      slab(G, C, [-0.3, 0.47, 0], [0.3, 0.5, 0.36], 0, 'toy·', green, 0.085, at, (id, a, b) => id < 2 && Math.abs(a) < 0.08 && b > 0.02 && b < 0.18);   // 운전실
+      for (const sd of [1, -1]) speck(G, [-0.3, 0.57, sd * 0.185], [sd, 0, 0], Y, '■', warm, 0.17, at + 0.2);   // 운전실 창
+      slab(G, C, [-0.3, 0.745, 0], [0.42, 0.045, 0.46], 0, '=', gold, 0.07, at);                // 지붕
+      tubeY(G, C, [0.3, 0.5, 0], 0.045, 0.045, 0.17, 'I', gold, 0.06, at);                      // 굴뚝 대롱
+      tubeY(G, C, [0.3, 0.67, 0], 0.05, 0.09, 0.09, 'o', gold, 0.055, at);                      // 나팔처럼 벌어진 굴뚝 입
+      orb(G, C, [0.06, 0.55, 0], [0.065, 0.065, 0.065], 'o', gold, 0.06, at);                   // 증기 돔
+      plate(G, [0.53, 0.14, 0], NZ, unitv([-0.6, 0.8, 0]), 0.32, 0.2, '/', gold, 0.08, at);      // 배장기
+      wheel(G, C, -0.3, 0.12, at); wheel(G, C, 0.0, 0.1, at); wheel(G, C, 0.27, 0.1, at);
+      for (const sd of [1, -1]) plate(G, [-0.01, 0.1, sd * 0.235], [sd, 0, 0], Y, 0.5, 0.04, '-', dim, 0.06, at);   // 바퀴를 잇는 연결봉
+      slab(G, C, [-0.53, 0.2, 0], [0.1, 0.03, 0.06], 0, '-', dim, 0.05, at);                    // 연결기
+      return (inner) => { for (let k = 0; k < 3; k++) puff(inner, [0.3, 0.8, 0], [-0.6, 0, 0], 0.5, k, 3, at + 0.3, 0.075, ivory.map((v) => v * 0.8)); };
     });
-    car(1, (G, C, at) => { slab(G, C, [0, 0.27, 0], [0.56, 0.24, 0.32], 0, 'merry ', green, gs, at); orb(G, C, [0, 0.55, 0], [0.16, 0.16, 0.16], 'star ', gold, 0.09, at + 0.1); wheels(G, [-0.17, 0.17], at); speck(G, [0.34, 0.2, 0], X, Y, '-', gold, 0.2, at); });
-    car(2, (G, C, at) => { slab(G, C, [0, 0.27, 0], [0.56, 0.24, 0.32], 0, 'xmas ', ivory, gs, at); slab(G, C, [0, 0.5, 0], [0.26, 0.22, 0.24], 0.3, 'gift ', red, 0.085, at + 0.1); speck(G, [0, 0.64, 0], X, Y, '#', gold, 0.16, at + 0.2); wheels(G, [-0.17, 0.17], at); speck(G, [0.34, 0.2, 0], X, Y, '-', gold, 0.2, at); });
-    car(3, (G, C, at) => { slab(G, C, [0, 0.27, 0], [0.56, 0.24, 0.32], 0, 'joy ', red, gs, at); for (const [x, c2] of [[-0.14, gold], [0.02, ivory], [0.17, green]]) orb(G, C, [x, 0.48, 0], [0.09, 0.09, 0.09], 'o ', c2, 0.08, at + 0.1); wheels(G, [-0.17, 0.17], at); speck(G, [0.34, 0.2, 0], X, Y, '-', gold, 0.2, at); });
+    const wagon = (k, text, color, cargo) => car(k, (G, C, at) => {
+      slab(G, C, [0, 0.19, 0], [0.66, 0.05, 0.34], 0, '=', dim, 0.06, at);
+      slab(G, C, [0, 0.335, 0], [0.58, 0.24, 0.32], 0, text, color, 0.085, at);
+      wheel(G, C, -0.19, 0.09, at); wheel(G, C, 0.19, 0.09, at);
+      slab(G, C, [0.39, 0.19, 0], [0.12, 0.03, 0.06], 0, '-', dim, 0.05, at);
+      cargo(G, C, at + 0.1);
+    });
+    wagon(1, 'merry·', green, (G, C, at) => {        // 별 공 셋
+      orb(G, C, [0, 0.57, 0], [0.13, 0.13, 0.13], 'star·', gold, 0.075, at);
+      orb(G, C, [-0.19, 0.53, 0.03], [0.08, 0.08, 0.08], 'o', red, 0.065, at); orb(G, C, [0.19, 0.53, -0.03], [0.08, 0.08, 0.08], 'o', ivory, 0.065, at);
+    });
+    wagon(2, 'xmas·', ivory, (G, C, at) => {         // 선물 둘
+      slab(G, C, [-0.11, 0.565, 0], [0.24, 0.22, 0.22], 0.3, 'gift·', red, 0.075, at);
+      for (const sd of [-1, 1]) orb(G, null, [-0.11 + sd * 0.05, 0.7, 0], [0.045, 0.035, 0.03], 'o', gold, 0.045, at + 0.1);
+      slab(G, C, [0.17, 0.53, 0.01], [0.17, 0.15, 0.18], -0.25, 'joy·', green, 0.07, at);
+      speck(G, [0.17, 0.625, 0.01], X, Y, '#', gold, 0.1, at + 0.1);
+    });
+    wagon(3, 'joy·', red, (G, C, at) => {            // 작은 트리와 방울 둘
+      tubeY(G, C, [0, 0.455, 0], 0.15, 0.012, 0.38, 'fir·', green, 0.07, at);
+      for (const sd of [1, -1]) speck(G, [0, 0.87, 0], [sd, 0, 0], Y, '*', gold, 0.15, at + 0.2);
+      orb(G, C, [-0.21, 0.51, 0], [0.06, 0.06, 0.06], 'o', gold, 0.055, at); orb(G, C, [0.21, 0.51, 0], [0.06, 0.06, 0.06], 'o', ivory, 0.055, at);
+    });
   }
   atlasTex.needsUpdate = true;
 
@@ -1665,6 +1792,7 @@ print("메리 크리스마스,", you)`;
     moonMesh.material.uniforms.uLit.value.x = portrait ? MOON_L.x : -MOON_L.x;   // 빛은 트리 쪽에서 온다   // 달은 글과 겹치지 않는 하늘에 둔다
     moonG.position.copy(MOON); moonHalo.position.copy(MOON);
     auroraMesh.position.set(portrait ? 24 : 0, portrait ? 7.6 : 0, 0);   // 세로 화면에서는 제목 뒤 하늘로 옮긴다
+    trackMesh.scale.x = portrait ? 6.3 / TRAIN_RX : 1;                    // 세로 화면에서는 선로를 좁힌다
     camera.aspect = aspect;
     renderer.setPixelRatio(dpr); renderer.setSize(sw, sh, false);
     composer.setPixelRatio(dpr); composer.setSize(sw, sh);
@@ -1852,9 +1980,17 @@ print("메리 크리스마스,", you)`;
     for (const [m, t0] of [[bearMesh, TOY_T.bear], [snowmanMesh, TOY_T.snowman], [cakeMesh, TOY_T.cake]]) { const u = pop(m, t0); m.position.y = Math.sin(u * Math.PI) * 0.55; }
     // 기차: 트리와 반대 방향으로 돈다. 칸마다 길을 따라 제 방향을 본다
     for (const cr of trainCars) {
-      const a = 1.2 - t * 0.3 + cr.k * 0.2, u = pop(cr.g, cr.at);
-      cr.g.position.set(Math.cos(a) * (L.portrait ? 6.3 : 7.3), Math.sin(u * Math.PI) * 0.4 + Math.abs(Math.sin(t * 9 + cr.k * 1.7)) * 0.02, Math.sin(a) * 6.9);
-      cr.g.rotation.y = Math.PI / 2 - a;
+      const rx = L.portrait ? 6.3 : TRAIN_RX, a = 1.2 - t * 0.3 + cr.a, u = pop(cr.g, cr.at);
+      cr.g.position.set(Math.cos(a) * rx, Math.sin(u * Math.PI) * 0.4 + Math.abs(Math.sin(t * 9 + cr.k * 1.7)) * 0.012, Math.sin(a) * TRAIN_RZ);
+      cr.g.rotation.y = Math.atan2(Math.cos(a) * TRAIN_RZ, Math.sin(a) * rx);     // 타원 길의 접선 방향
+    }
+    // 연기: 한 덩이씩 피어올라 커지며 흐려지고, 다시 굴뚝에서 시작한다
+    for (const pf of puffs) {
+      const u = (t * 0.22 + pf.ph) % 1;
+      pf.m.position.set(pf.b[0] + pf.d[0] * u * u + Math.sin(t * 1.1 + pf.ph * 9) * 0.06 * u, pf.b[1] + pf.rise * u, pf.b[2] + pf.d[2] * u * u);
+      pf.m.scale.setScalar(0.4 + u * 1.1);
+      pf.m.rotation.y = t * 0.3 + pf.ph * 5;
+      pf.m.material.uniforms.uGain.value = Math.pow(Math.sin(Math.PI * u), 0.8);
     }
     const fk = easeOutCubic(clamp((t - STAR_T - 4.0) / 0.8));           // 촛불은 케이크가 다 나타난 뒤에 켜지고 저마다 흔들린다
     flames.forEach((f, i) => { const s = fk * (0.3 + 0.07 * Math.sin(t * 9 + i * 2.1) + 0.04 * Math.sin(t * 23 + i)); f.scale.set(s * 0.75, s, 1); });
